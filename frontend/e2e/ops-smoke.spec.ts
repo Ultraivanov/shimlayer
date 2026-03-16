@@ -171,7 +171,7 @@ async function openOps(page: Page) {
 
 async function waitForFlowRows(page: Page, minCount = 1) {
   await expect
-    .poll(async () => page.locator('[data-testid="ops-flow-queue"] .task-row').count(), {
+    .poll(async () => page.locator('[data-testid="ops-flow-row"]').count(), {
       timeout: 20_000
     })
     .toBeGreaterThanOrEqual(minCount);
@@ -183,12 +183,12 @@ test.describe("Ops smoke", () => {
     await openOps(page);
     await waitForFlowRows(page, 1);
 
-    const queueRows = page.locator('[data-testid="ops-flow-queue"] .task-row');
-    await expect(queueRows.first()).toBeVisible();
-    await queueRows.first().click();
+    const targetRow = page.locator(`[data-testid="ops-flow-row"][data-task-id="${taskId}"]`);
+    await expect(targetRow).toBeVisible({ timeout: 20_000 });
+    await targetRow.click();
 
     await expect(page.locator('[data-testid="ops-flow-inspector"]')).toBeVisible();
-    await expect(page.locator('[data-testid="ops-flow-inspector"] .detail-block .mono').first()).toContainText(taskId);
+    await expect(page.locator('[data-testid="ops-inspector-task-id"]')).toContainText(taskId);
   });
 
   test("single force-status action works via confirm dialog", async ({ page, request }) => {
@@ -196,8 +196,7 @@ test.describe("Ops smoke", () => {
     await openOps(page);
     await waitForFlowRows(page, 1);
 
-    const queueRows = page.locator('[data-testid="ops-flow-queue"] .task-row');
-    const targetRow = queueRows.filter({ hasText: taskId.slice(0, 8) }).first();
+    const targetRow = page.locator(`[data-testid="ops-flow-row"][data-task-id="${taskId}"]`);
     await expect(targetRow).toBeVisible({ timeout: 20_000 });
     await targetRow.click();
     await expect(targetRow).toHaveClass(/is-active/);
@@ -294,23 +293,23 @@ test.describe("Ops smoke", () => {
 
   test("manual review lock hides claimed task from other reviewer", async ({ browser, request }) => {
     const taskId = await seedManualRequiredTask(request, "lock");
-    const short = taskId.slice(0, 8);
 
     const reviewer1 = await browser.newPage();
     await withAdminUser(reviewer1, "e2e-reviewer-1");
     await openOps(reviewer1);
     await reviewer1.locator('[data-testid="ops-flow-queue"]').getByRole("button", { name: "Manual review" }).first().click();
     await reviewer1.getByRole("button", { name: "Refresh" }).first().click();
-    await expect(reviewer1.locator('[data-testid="ops-flow-queue"] .task-row').filter({ hasText: short })).toBeVisible({ timeout: 20_000 });
+    const row = reviewer1.locator(`[data-testid="ops-flow-row"][data-task-id="${taskId}"]`);
+    await expect(row).toBeVisible({ timeout: 20_000 });
     await reviewer1.locator('[data-testid="ops-flow-queue"]').getByRole("button", { name: "Take next" }).click();
-    await expect(reviewer1.locator('[data-testid="ops-flow-inspector"] .detail-block .mono').first()).toContainText(taskId);
+    await expect(reviewer1.locator('[data-testid="ops-inspector-task-id"]')).toContainText(taskId);
 
     const reviewer2 = await browser.newPage();
     await withAdminUser(reviewer2, "e2e-reviewer-2");
     await openOps(reviewer2);
     await reviewer2.locator('[data-testid="ops-flow-queue"]').getByRole("button", { name: "Manual review" }).first().click();
     await reviewer2.getByRole("button", { name: "Refresh" }).first().click();
-    await expect(reviewer2.locator('[data-testid="ops-flow-queue"] .task-row').filter({ hasText: short })).toHaveCount(0, { timeout: 20_000 });
+    await expect(reviewer2.locator(`[data-testid="ops-flow-row"][data-task-id="${taskId}"]`)).toHaveCount(0, { timeout: 20_000 });
 
     await reviewer1.close();
     await reviewer2.close();

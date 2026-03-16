@@ -1294,6 +1294,7 @@ def ops_manual_review_queue(
 def ops_claim_next_manual_review(
     status_filter: str | None = None,
     task_type: str | None = None,
+    exclude_task_id: UUID | None = None,
     api_key: str = Depends(require_api_key),
     admin_key: str = Depends(require_admin_key),
     admin_ctx: AdminContext = Depends(require_admin_context),
@@ -1306,6 +1307,7 @@ def ops_claim_next_manual_review(
         lock_seconds=settings.shimlayer_manual_review_lock_seconds,
         status=status_filter,
         task_type=task_type,
+        exclude_task_id=exclude_task_id,
     )
 
 

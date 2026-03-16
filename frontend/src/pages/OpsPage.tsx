@@ -172,6 +172,7 @@ export function OpsPage() {
   const [showLockedManualReview, setShowLockedManualReview] = useState<boolean>(() => loadFlag("ops.showLockedManualReview", false));
   const [manualReviewMineOnly, setManualReviewMineOnly] = useState<boolean>(() => loadFlag("ops.manualReviewMineOnly", false));
   const [manualReviewLockedOnly, setManualReviewLockedOnly] = useState<boolean>(() => loadFlag("ops.manualReviewLockedOnly", false));
+  const [manualReviewAutoRenew, setManualReviewAutoRenew] = useState<boolean>(() => loadFlag("ops.manualReviewAutoRenew", true));
   const [statusFilter, setStatusFilter] = useState<string>(() => localStorage.getItem("ops.statusFilter") ?? "");
   const [taskTypeFilter, setTaskTypeFilter] = useState<string>(() => localStorage.getItem("ops.taskTypeFilter") ?? "");
   const [searchQuery, setSearchQuery] = useState<string>(() => localStorage.getItem("ops.searchQuery") ?? "");
@@ -208,6 +209,10 @@ export function OpsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isActionRunning, setIsActionRunning] = useState(false);
   const [isClaimRunning, setIsClaimRunning] = useState(false);
+  const [isLockRenewing, setIsLockRenewing] = useState(false);
+  const [lockRenewBackoffUntilMs, setLockRenewBackoffUntilMs] = useState(0);
+  const [lockRenewLastOkAtMs, setLockRenewLastOkAtMs] = useState(0);
+  const [lockRenewLastError, setLockRenewLastError] = useState("");
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [isBulkRunning, setIsBulkRunning] = useState(false);
   const [incidentUpdatingId, setIncidentUpdatingId] = useState<string | null>(null);
@@ -225,6 +230,7 @@ export function OpsPage() {
   const pendingManualReviewSelectRef = useRef<string | null>(null);
   const claimedManualReviewIdRef = useRef<string>("");
   const lockRenewInFlightRef = useRef(false);
+  const lockRenewLastAtRef = useRef(0);
 
   const selectedStatusOption = useMemo<string[]>(() => (statusFilter ? [statusFilter] : []), [statusFilter]);
   const selectedForceStatus = useMemo<string[]>(() => [forceStatus], [forceStatus]);
@@ -257,6 +263,10 @@ export function OpsPage() {
   useEffect(() => {
     localStorage.setItem("ops.showManualReviewQueue", String(showManualReviewQueue));
   }, [showManualReviewQueue]);
+
+  useEffect(() => {
+    localStorage.setItem("ops.manualReviewAutoRenew", String(manualReviewAutoRenew));
+  }, [manualReviewAutoRenew]);
   useEffect(() => {
     localStorage.setItem("ops.showLockedManualReview", String(showLockedManualReview));
   }, [showLockedManualReview]);
@@ -602,9 +612,11 @@ export function OpsPage() {
     }
     setIsClaimRunning(true);
     try {
-      await Api.claimManualReview(taskId);
+      const task = await Api.claimManualReview(taskId);
       claimedManualReviewIdRef.current = taskId;
       setSelectedFlowId(taskId);
+      setSelectedFlow(task);
+      setFlows((prev) => prev.map((t) => (t.id === taskId ? ({ ...(t as any), review: task.review } as any) : t)));
     } catch (e) {
       pushToast("error", `Claim failed: ${String(e)}`);
       await refresh();
@@ -643,7 +655,11 @@ export function OpsPage() {
     try {
       await Api.releaseManualReview(selectedFlowId);
       claimedManualReviewIdRef.current = "";
-      const next = await Api.claimNextManualReview({ status: statusFilter || undefined, taskType: taskTypeFilter || undefined });
+      const next = await Api.claimNextManualReview({
+        status: statusFilter || undefined,
+        taskType: taskTypeFilter || undefined,
+        excludeTaskId: selectedFlowId
+      });
       if (next) pendingManualReviewSelectRef.current = next.id;
       await refresh();
       if (!next) pushToast("error", "Manual review queue is empty");
@@ -864,32 +880,37 @@ export function OpsPage() {
     if (!isPageVisible) return;
     if (!selectedFlowId) return;
     if (!manualReviewClaimState.isMine) return;
-    const timer = window.setInterval(() => {
-      if (lockRenewInFlightRef.current) return;
-      if (!showManualReviewQueue || !isPageVisible || !selectedFlowId) return;
-      if (!manualReviewClaimState.isMine) return;
-      const remainingMs = manualReviewClaimState.claimedUntilMs - Date.now();
-      if (!Number.isFinite(remainingMs) || remainingMs > 2 * 60 * 1000) return;
-      lockRenewInFlightRef.current = true;
-      void Api.claimManualReview(selectedFlowId)
-        .then((task) => {
-          if (task && task.id === selectedFlowId) {
-            setSelectedFlow(task);
-            setFlows((prev) =>
-              prev.map((t) => (t.id === selectedFlowId ? ({ ...(t as any), review: task.review } as any) : t))
-            );
-          }
-        })
-        .catch((e) => {
-          pushToast("error", `Lock renew failed: ${String(e)}`);
-          void refreshRef.current?.();
-        })
-        .finally(() => {
-          lockRenewInFlightRef.current = false;
-        });
-    }, 30_000);
-    return () => window.clearInterval(timer);
-  }, [isPageVisible, manualReviewClaimState.claimedUntilMs, manualReviewClaimState.isMine, selectedFlowId, showManualReviewQueue]);
+    if (!manualReviewAutoRenew) return;
+    if (lockRenewInFlightRef.current) return;
+    const remainingMs = manualReviewClaimState.claimedUntilMs - nowMs;
+    if (!Number.isFinite(remainingMs) || remainingMs <= 0) return;
+    if (remainingMs > 25_000) return;
+    if (nowMs - lockRenewLastAtRef.current < 5_000) return;
+    lockRenewLastAtRef.current = nowMs;
+    lockRenewInFlightRef.current = true;
+    void Api.claimManualReview(selectedFlowId)
+      .then((task) => {
+        if (task && task.id === selectedFlowId) {
+          setSelectedFlow(task);
+          setFlows((prev) => prev.map((t) => (t.id === selectedFlowId ? ({ ...(t as any), review: task.review } as any) : t)));
+        }
+      })
+      .catch((e) => {
+        pushToast("error", `Lock renew failed: ${String(e)}`);
+        void refreshRef.current?.();
+      })
+      .finally(() => {
+        lockRenewInFlightRef.current = false;
+      });
+  }, [
+    isPageVisible,
+    manualReviewAutoRenew,
+    manualReviewClaimState.claimedUntilMs,
+    manualReviewClaimState.isMine,
+    nowMs,
+    selectedFlowId,
+    showManualReviewQueue
+  ]);
 
   async function requeue(id: string) {
     try {
@@ -1295,11 +1316,18 @@ export function OpsPage() {
         if (!selectedFlowId || isClaimRunning || isActionRunning) return;
         if (!manualReviewClaimState.isMine) return;
         event.preventDefault();
-        void runManualReview(selectedFlowId, key === "1" ? "approved" : "rejected");
+        void runManualReview(selectedFlowId, key === "1" ? "approved" : "rejected", key === "2");
         return;
       }
       if (!selectedFlowId || isActionRunning) return;
       if (key === "a" && canAction("manual_review")) {
+        if (showManualReviewQueue) {
+          if (isClaimRunning) return;
+          if (!manualReviewClaimState.isMine) return;
+          event.preventDefault();
+          void runManualReview(selectedFlowId, "approved");
+          return;
+        }
         event.preventDefault();
         void runAction("manual_review", { manual_verdict: "approved" });
         return;
@@ -1560,6 +1588,7 @@ export function OpsPage() {
             </span>
             <Button
               view="action"
+              data-testid="ops-manual-take-next"
               onClick={() => {
                 setIsClaimRunning(true);
                 void Api.claimNextManualReview({ status: statusFilter || undefined, taskType: taskTypeFilter || undefined })
@@ -1625,7 +1654,17 @@ export function OpsPage() {
               Locked only
             </Button>
             <Button
+              view={manualReviewAutoRenew ? "action" : "outlined"}
+              data-testid="ops-manual-auto-renew"
+              onClick={() => setManualReviewAutoRenew((v) => !v)}
+              disabled={isRefreshing}
+              title="Automatically renew your lock when it is close to expiring"
+            >
+              Auto-renew
+            </Button>
+            <Button
               view="outlined"
+              data-testid="ops-manual-release"
               onClick={() => void releaseSelectedManualReview()}
               disabled={!selectedFlowId || isClaimRunning || isRefreshing || !manualReviewClaimState.isMine}
               title={!manualReviewClaimState.isMine ? "Claim the flow to release it" : undefined}
@@ -1634,6 +1673,7 @@ export function OpsPage() {
             </Button>
             <Button
               view="outlined"
+              data-testid="ops-manual-skip"
               onClick={() => void skipSelectedManualReview()}
               disabled={!selectedFlowId || isClaimRunning || isRefreshing || !manualReviewClaimState.isMine}
               title={!manualReviewClaimState.isMine ? "Claim the flow to skip it" : undefined}
@@ -1700,7 +1740,7 @@ export function OpsPage() {
           <Button view="outlined" onClick={() => applyFlowPreset("overdue")}>Only overdue</Button>
           <Button view="outlined" onClick={() => applyFlowPreset("disputed")}>Disputed</Button>
           <Button view="outlined" onClick={() => applyFlowPreset("sla_risk")}>SLA risk</Button>
-          <Button view="outlined" onClick={() => applyFlowPreset("manual_review")}>Manual review</Button>
+          <Button view="outlined" data-testid="ops-preset-manual-review" onClick={() => applyFlowPreset("manual_review")}>Manual review</Button>
           <Button view="flat" onClick={() => applyFlowPreset("clear")}>Reset</Button>
         </div>
         <div className="row-tight">
@@ -1769,6 +1809,8 @@ export function OpsPage() {
             return (
               <div
                 key={t.id}
+                data-testid="ops-flow-row"
+                data-task-id={t.id}
                 className={`task-row ${selectedFlowId === t.id ? "is-active" : ""} ${claimActive ? (claimIsMine ? "claim-mine" : "claim-locked") : ""}`}
                 onClick={() => void claimAndSelectFlow(t.id)}
                 role="button"
@@ -1803,6 +1845,8 @@ export function OpsPage() {
                         {showManualReviewQueue && claimActive ? (
                           <>
                             <span
+                              data-testid="ops-claim-badge"
+                              data-claim-state={claimIsMine ? "mine" : "locked"}
                               className={`claim-badge ${claimIsMine ? "claim-badge-mine" : "claim-badge-locked"}`}
                               title={claimBadgeTitle}
                             >
@@ -2081,7 +2125,7 @@ export function OpsPage() {
 
             {inspectorTab === "summary" ? (
               <div className="detail-block">
-                <p><strong>ID:</strong> <span className="mono">{selectedFlow.id}</span></p>
+                <p><strong>ID:</strong> <span className="mono" data-testid="ops-inspector-task-id">{selectedFlow.id}</span></p>
                 <p><strong>Account:</strong> <span className="mono">{selectedFlow.account_id}</span></p>
                 <p><strong>Worker:</strong> <span className="mono">{selectedFlow.worker_id ?? "unassigned"}</span></p>
                 <p><strong>Status:</strong> {selectedFlow.status}</p>

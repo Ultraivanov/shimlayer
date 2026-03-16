@@ -87,7 +87,7 @@ export const Api = {
     http<Task>("/v1/tasks", { method: "POST", body: JSON.stringify(payload) }),
   createJudgment: (payload: Record<string, unknown>) =>
     http<Task>("/v1/judgments", { method: "POST", body: JSON.stringify(payload) }),
-  getTask: (taskId: string) => http<Record<string, unknown>>(`/v1/tasks/${taskId}`),
+  getTask: (taskId: string) => http<TaskWithReview>(`/v1/tasks/${taskId}`),
   listMyTasks: (params: { limit?: number; status?: string; taskType?: string } = {}) => {
     const q = new URLSearchParams();
     if (params.limit) q.set("limit", String(params.limit));
@@ -97,8 +97,11 @@ export const Api = {
     return http<TaskWithReview[]>(`/v1/tasks${suffix}`);
   },
   claimTask: (taskId: string) => http<Task>(`/v1/tasks/${taskId}/claim`, { method: "POST" }),
-  completeTask: (taskId: string, result: Record<string, unknown>) =>
-    http<Task>(`/v1/tasks/${taskId}/complete`, { method: "POST", body: JSON.stringify({ result }) }),
+  completeTask: (taskId: string, result: Record<string, unknown>, workerNote?: string | null) =>
+    http<Task>(`/v1/tasks/${taskId}/complete`, {
+      method: "POST",
+      body: JSON.stringify({ result, worker_note: workerNote ?? null })
+    }),
   uploadProof: (taskId: string, payload: Record<string, unknown>) =>
     http(`/v1/tasks/${taskId}/proof`, { method: "POST", body: JSON.stringify(payload) }),
   uploadArtifact: (taskId: string, payload: Record<string, unknown>) =>
@@ -173,10 +176,11 @@ export const Api = {
     const suffix = q.toString() ? `?${q.toString()}` : "";
     return http<TaskWithReview[]>(`/v1/ops/manual-review${suffix}`, {}, true);
   },
-  claimNextManualReview: (params: { status?: string; taskType?: string } = {}) => {
+  claimNextManualReview: (params: { status?: string; taskType?: string; excludeTaskId?: string } = {}) => {
     const q = new URLSearchParams();
     if (params.status) q.set("status_filter", params.status);
     if (params.taskType) q.set("task_type", params.taskType);
+    if (params.excludeTaskId) q.set("exclude_task_id", params.excludeTaskId);
     const suffix = q.toString() ? `?${q.toString()}` : "";
     return http<TaskWithReview | null>(`/v1/ops/manual-review/claim-next${suffix}`, { method: "POST" }, true);
   },

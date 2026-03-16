@@ -379,6 +379,7 @@ class InMemoryRepository:
         lock_seconds: int,
         status: str | None = None,
         task_type: str | None = None,
+        exclude_task_id: UUID | None = None,
     ) -> TaskWithReview | None:
         with self._lock:
             now = utcnow()
@@ -389,6 +390,8 @@ class InMemoryRepository:
                 only_manual_review=True,
             )
             for t in rows:
+                if exclude_task_id and t.id == exclude_task_id:
+                    continue
                 review = self._reviews.get(t.id)
                 if not review or review.review_status != ReviewStatus.MANUAL_REQUIRED:
                     continue

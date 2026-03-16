@@ -573,6 +573,7 @@ class PostgresRepository:
         lock_seconds: int,
         status: str | None = None,
         task_type: str | None = None,
+        exclude_task_id: UUID | None = None,
     ) -> TaskWithReview | None:
         capped_limit = 1
         filters: list[str] = [
@@ -586,6 +587,9 @@ class PostgresRepository:
         if task_type:
             filters.append("t.task_type = %s")
             params.append(task_type)
+        if exclude_task_id:
+            filters.append("r.task_id <> %s")
+            params.append(exclude_task_id)
         where_sql = f"where {' and '.join(filters)}"
         with self._conn() as conn:
             with conn.cursor() as cur:

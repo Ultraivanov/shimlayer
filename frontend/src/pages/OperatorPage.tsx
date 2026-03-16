@@ -45,6 +45,14 @@ export function OperatorPage() {
     try {
       const list = await Api.listMyTasks({ limit: 100 });
       setTasks(list);
+      if (selectedTaskId) {
+        try {
+          const detail = await Api.getTask(selectedTaskId);
+          setSelectedTaskDetail(detail);
+        } catch {
+          // Ignore detail refresh errors; list refresh is still useful.
+        }
+      }
     } catch (e) {
       setError(String(e));
     }
@@ -69,7 +77,7 @@ export function OperatorPage() {
     }
     setError(null);
     void Api.getTask(selectedTaskId)
-      .then((t) => setSelectedTaskDetail(t as TaskWithReview))
+      .then((t) => setSelectedTaskDetail(t))
       .catch((e) => setError(String(e)));
   }, [selectedTaskId]);
 
@@ -98,7 +106,7 @@ export function OperatorPage() {
         selectedTask.task_type === "quick_judgment"
           ? { decision: "yes", note: "Safe to continue." }
           : { action_summary: "Updated selector and resumed flow.", next_step: "Continue automation." };
-      const updated = await Api.completeTask(selectedTask.id, result);
+      const updated = await Api.completeTask(selectedTask.id, result, null);
       setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
       await refresh();
     } catch (e) {
@@ -143,7 +151,7 @@ export function OperatorPage() {
 
   return (
     <section className="grid two-col">
-      <Card className="panel" view="raised">
+      <Card className="panel" view="raised" data-testid="operator-queue">
         <div className="section-head">
           <h2>Queue</h2>
           <span className="chip">{filteredTasks.length}/{tasks.length}</span>
@@ -188,21 +196,24 @@ export function OperatorPage() {
               key={t.id}
               className={`task-row ${selectedTask?.id === t.id ? "is-active" : ""}`}
               onClick={() => setSelectedTaskId(t.id)}
+              data-testid="operator-task-row"
+              data-task-id={t.id}
             >
               <span className="task-type">{t.task_type}</span>
+              <span className="muted mono">{t.id.slice(0, 8)}</span>
               <span className={`status status-${t.status}`}>{t.status}</span>
             </button>
           ))}
         </div>
       </Card>
 
-      <Card className="panel" view="raised">
+      <Card className="panel" view="raised" data-testid="operator-actions">
         <h2>Operator Actions</h2>
         {!selectedTask ? <p className="muted">Select a task from queue.</p> : null}
         {selectedTask ? (
           <>
             <p className="muted mono">{selectedTask.id}</p>
-            <div className="detail-block">
+            <div className="detail-block" data-testid="operator-task-summary">
               <p>
                 <strong>Type:</strong> {selectedTask.task_type}
               </p>
@@ -232,7 +243,7 @@ export function OperatorPage() {
               </div>
             ) : null}
             {(selectedTaskDetail?.artifacts ?? []).length > 0 ? (
-              <div className="detail-block">
+              <div className="detail-block" data-testid="operator-artifacts">
                 <p className="muted">Artifacts</p>
                 {(selectedTaskDetail?.artifacts ?? []).map((a, idx) => (
                   <div key={`artifact-${idx}`} className="incident-event">
@@ -266,13 +277,13 @@ export function OperatorPage() {
               </div>
             ) : null}
             <div className="row">
-              <Button size="l" view="action" onClick={claim} loading={isWorking}>
+              <Button size="l" view="action" onClick={claim} loading={isWorking} data-testid="operator-claim">
                 Claim
               </Button>
-              <Button size="l" view="normal" onClick={complete} disabled={!hasQualityProof || isWorking} loading={isWorking}>
+              <Button size="l" view="normal" onClick={complete} disabled={!hasQualityProof || isWorking} loading={isWorking} data-testid="operator-complete">
                 Complete
               </Button>
-              <Button size="l" view="outlined" onClick={addProof} disabled={isWorking || hasQualityProof} loading={isWorking}>
+              <Button size="l" view="outlined" onClick={addProof} disabled={isWorking || hasQualityProof} loading={isWorking} data-testid="operator-add-proof">
                 Add Proof
               </Button>
             </div>

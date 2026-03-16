@@ -99,6 +99,7 @@ class Repository(Protocol):
         lock_seconds: int,
         status: str | None = None,
         task_type: str | None = None,
+        exclude_task_id: UUID | None = None,
     ) -> TaskWithReview | None: ...
 
     def claim_manual_review(
