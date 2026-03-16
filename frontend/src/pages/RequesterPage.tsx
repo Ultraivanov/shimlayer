@@ -3,6 +3,7 @@ import { Button, Card, Select, TextArea, TextInput } from "@gravity-ui/uikit";
 
 import { Api } from "../api";
 import type { BalanceResponse, PackageInfo, Task, TaskWithReview } from "../types";
+import { ArtifactTile } from "../components/ArtifactTile";
 
 type Props = {
   pushTask: (task: Task) => void;
@@ -54,8 +55,11 @@ export function RequesterPage({ pushTask }: Props) {
   const [autoRefreshPausedUntilMs, setAutoRefreshPausedUntilMs] = useState<number>(0);
   const [autoRefreshFailureCount, setAutoRefreshFailureCount] = useState<number>(0);
   const [autoRefreshLastError, setAutoRefreshLastError] = useState<string>("");
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const refreshInFlightRef = useRef(false);
   const balanceRefreshInFlightRef = useRef(false);
+  const autoRefreshPausedUntilMsRef = useRef(0);
+  const proofFormRef = useRef<HTMLDivElement | null>(null);
 
   const TASK_STATUSES = ["any", "pending", "queued", "claimed", "completed", "failed", "disputed", "refunded"] as const;
   const TASK_TYPES = ["any", "stuck_recovery", "quick_judgment"] as const;
@@ -116,6 +120,14 @@ export function RequesterPage({ pushTask }: Props) {
     if (kb < 1024) return `${kb.toFixed(1)} KB`;
     const mb = kb / 1024;
     return `${mb.toFixed(2)} MB`;
+  }
+
+  function formatDurationShort(ms: number): string {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    if (m <= 0) return `${s}s`;
+    return `${m}m ${String(s).padStart(2, "0")}s`;
   }
 
   async function copyText(value: string) {
@@ -491,6 +503,22 @@ export function RequesterPage({ pushTask }: Props) {
     } finally {
       setProofBusy(false);
     }
+  }
+
+  function prefillProofFromArtifact(artifact: unknown) {
+    const a = artifact as any;
+    const storage = String(a?.storage_path ?? "").trim();
+    if (!storage) return;
+    setProofArtifactType(String(a?.artifact_type ?? "logs") || "logs");
+    setProofStoragePath(storage);
+    setProofChecksum(String(a?.checksum_sha256 ?? ""));
+    try {
+      const meta = a?.metadata && typeof a.metadata === "object" && !Array.isArray(a.metadata) ? a.metadata : {};
+      setProofMetadataJson(JSON.stringify(meta));
+    } catch {
+      setProofMetadataJson("{}");
+    }
+    proofFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   async function claimSelectedTask() {
@@ -931,6 +959,7 @@ export function RequesterPage({ pushTask }: Props) {
             <Card className="panel span-2" view="raised" data-testid="requester-artifacts">
               <h3>Artifacts</h3>
               <div className="detail-block">
+                <div ref={proofFormRef} />
                 <h4 style={{ margin: "0 0 6px 0" }}>Register proof metadata</h4>
                 <div className="row-tight" style={{ alignItems: "center" }}>
                   <Button size="s" view="flat" disabled={proofBusy || !selectedTask} onClick={() => applyProofTemplate("s3")}>
@@ -1039,64 +1068,34 @@ export function RequesterPage({ pushTask }: Props) {
               </p>
               {(selectedTask.artifacts ?? []).length === 0 ? <p className="muted">No artifacts.</p> : null}
               {(selectedTask.artifacts ?? []).map((a, idx) => (
-                <div key={`artifact-${idx}`} className="incident-event">
-                  {(() => {
-                    const storagePath = String((a as any).storage_path ?? "");
-                    const checksum = String((a as any).checksum_sha256 ?? "");
-                    const artifactType = String((a as any).artifact_type ?? "");
-                    const isLocal = storagePath.startsWith("local:");
-                    const hasChecksum = checksum.length === 64;
-                    const isQuality = isLocal || hasChecksum;
-                    const canDownload = "id" in (a as any) && "task_id" in (a as any) && isLocal;
-                    return (
-                      <>
-                        <div className="row-tight" style={{ alignItems: "center" }}>
-                          {artifactType ? <span className="chip">type {artifactType}</span> : null}
-                          <span className="chip">{isLocal ? "local" : "external"}</span>
-                          <span
-                            className="chip"
-                            style={{
-                              background: isQuality ? "rgba(46, 204, 113, 0.18)" : "rgba(241, 196, 15, 0.16)",
-                              border: `1px solid ${isQuality ? "rgba(46, 204, 113, 0.35)" : "rgba(241, 196, 15, 0.3)"}`
-                            }}
-                            title={isQuality ? "Counts as quality proof" : "Does not count as quality proof"}
-                          >
-                            {isQuality ? "quality proof" : "not quality"}
-                          </span>
-                          {hasChecksum ? <span className="chip mono">sha256 ok</span> : <span className="chip muted">no sha256</span>}
-                          {canDownload ? (
-                            <Button
-                              size="s"
-                              view="outlined"
-                              onClick={() => {
-                                const taskId = String((a as any).task_id);
-                                const artifactId = String((a as any).id);
-                                void Api.downloadArtifact(taskId, artifactId).then(({ blob, filename }) => {
-                                  const url = URL.createObjectURL(blob);
-                                  const link = document.createElement("a");
-                                  link.href = url;
-                                  link.download = filename;
-                                  document.body.appendChild(link);
-                                  link.click();
-                                  link.remove();
-                                  URL.revokeObjectURL(url);
-                                }).catch((e) => setError(String(e)));
-                              }}
-                            >
-                              Download
-                            </Button>
-                          ) : null}
-                        </div>
-                        {!isQuality ? (
-                          <p className="muted" style={{ marginTop: 6, marginBottom: 0 }}>
-                            This artifact won’t unblock completion. Upload a `local:` artifact or register proof with a valid `checksum_sha256`.
-                          </p>
-                        ) : null}
-                      </>
-                    );
-                  })()}
-                  <pre className="json-code">{JSON.stringify(a, null, 2)}</pre>
-                </div>
+                <ArtifactTile
+                  key={`artifact-${idx}`}
+                  artifact={a}
+                  onDownload={(taskId, artifactId) =>
+                    Api.downloadArtifact(taskId, artifactId, String((a as any)?.metadata?.filename ?? ""))
+                      .then(({ blob, filename }) => {
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement("a");
+                        link.href = url;
+                        link.download = filename;
+                        document.body.appendChild(link);
+                        link.click();
+                        link.remove();
+                        URL.revokeObjectURL(url);
+                      })
+                      .catch((e) => setError(String(e)))
+                  }
+                  notify={(level, message) => {
+                    if (level === "error") setError(message);
+                  }}
+                  extraActions={
+                    String((a as any)?.storage_path ?? "").startsWith("local:") ? null : (
+                      <Button size="s" view="flat" onClick={() => prefillProofFromArtifact(a)} data-testid="artifact-register-proof">
+                        Register proof
+                      </Button>
+                    )
+                  }
+                />
               ))}
             </Card>
           </>

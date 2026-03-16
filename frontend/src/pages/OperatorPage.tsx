@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Card, Select, TextInput } from "@gravity-ui/uikit";
 
 import { Api } from "../api";
 import type { Task, TaskWithReview } from "../types";
+import { ArtifactTile } from "../components/ArtifactTile";
 
 function toBase64Utf8(text: string): string {
   const bytes = new TextEncoder().encode(text);
@@ -20,6 +21,17 @@ export function OperatorPage() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [isWorking, setIsWorking] = useState(false);
+  const [autoRefreshSeconds, setAutoRefreshSeconds] = useState<0 | 15 | 30 | 60>(() => {
+    const raw = Number(localStorage.getItem("operator.autoRefreshSeconds") ?? "15");
+    if (raw === 0 || raw === 15 || raw === 30 || raw === 60) return raw;
+    return 15;
+  });
+  const [isPageVisible, setIsPageVisible] = useState<boolean>(() => document.visibilityState === "visible");
+  const [autoRefreshPausedUntilMs, setAutoRefreshPausedUntilMs] = useState<number>(0);
+  const [autoRefreshFailureCount, setAutoRefreshFailureCount] = useState<number>(0);
+  const [autoRefreshLastError, setAutoRefreshLastError] = useState<string>("");
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const refreshInFlightRef = useRef(false);
 
   const TASK_STATUSES = ["any", "pending", "queued", "claimed", "completed", "failed", "disputed", "refunded"] as const;
   const TASK_TYPES = ["any", "stuck_recovery", "quick_judgment"] as const;
@@ -42,6 +54,8 @@ export function OperatorPage() {
 
   async function refresh() {
     setError(null);
+    if (refreshInFlightRef.current) return { ok: false, error: "refresh already in progress" };
+    refreshInFlightRef.current = true;
     try {
       const list = await Api.listMyTasks({ limit: 100 });
       setTasks(list);
@@ -53,14 +67,67 @@ export function OperatorPage() {
           // Ignore detail refresh errors; list refresh is still useful.
         }
       }
+      return { ok: true as const };
     } catch (e) {
-      setError(String(e));
+      const msg = String(e);
+      setError(msg);
+      return { ok: false as const, error: msg };
+    } finally {
+      refreshInFlightRef.current = false;
     }
   }
 
   useEffect(() => {
     void refresh();
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem("operator.autoRefreshSeconds", String(autoRefreshSeconds));
+  }, [autoRefreshSeconds]);
+
+  useEffect(() => {
+    const onVisibilityChange = () => setIsPageVisible(document.visibilityState === "visible");
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  function formatDurationShort(ms: number): string {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    if (m <= 0) return `${s}s`;
+    return `${m}m ${String(s).padStart(2, "0")}s`;
+  }
+
+  function resetAutoRefreshPause() {
+    setAutoRefreshPausedUntilMs(0);
+    setAutoRefreshFailureCount(0);
+    setAutoRefreshLastError("");
+  }
+
+  useEffect(() => {
+    if (autoRefreshSeconds === 0 || !isPageVisible) return;
+    const timer = window.setInterval(() => {
+      if (Date.now() < autoRefreshPausedUntilMs) return;
+      void refresh().then((res) => {
+        if (res.ok) {
+          if (autoRefreshFailureCount > 0 || autoRefreshLastError || autoRefreshPausedUntilMs > 0) resetAutoRefreshPause();
+          return;
+        }
+        const nextFailures = autoRefreshFailureCount + 1;
+        setAutoRefreshFailureCount(nextFailures);
+        setAutoRefreshLastError(res.error ?? "unknown error");
+        const pauseSeconds = Math.min(120, 10 * 2 ** Math.min(4, nextFailures - 1));
+        setAutoRefreshPausedUntilMs(Date.now() + pauseSeconds * 1000);
+      });
+    }, autoRefreshSeconds * 1000);
+    return () => window.clearInterval(timer);
+  }, [autoRefreshSeconds, isPageVisible, autoRefreshFailureCount, autoRefreshLastError, autoRefreshPausedUntilMs]);
 
   useEffect(() => {
     if (!selectedTaskId && filteredTasks.length > 0) setSelectedTaskId(filteredTasks[0].id);
@@ -155,9 +222,35 @@ export function OperatorPage() {
         <div className="section-head">
           <h2>Queue</h2>
           <span className="chip">{filteredTasks.length}/{tasks.length}</span>
-          <Button view="flat" onClick={() => void refresh()}>
-            Refresh
-          </Button>
+          <div className="row-tight" style={{ alignItems: "center" }}>
+            <span className="muted" title={autoRefreshLastError || undefined}>
+              Auto: {autoRefreshSeconds === 0 ? "off" : `${autoRefreshSeconds}s`}{" "}
+              {autoRefreshSeconds !== 0 && autoRefreshPausedUntilMs > nowMs
+                ? `(paused ${formatDurationShort(autoRefreshPausedUntilMs - nowMs)})`
+                : isPageVisible
+                  ? ""
+                  : "(paused)"}
+            </span>
+            <Button view={autoRefreshSeconds === 0 ? "action" : "outlined"} size="s" onClick={() => setAutoRefreshSeconds(0)}>Off</Button>
+            <Button view={autoRefreshSeconds === 15 ? "action" : "outlined"} size="s" onClick={() => setAutoRefreshSeconds(15)}>15s</Button>
+            <Button view={autoRefreshSeconds === 30 ? "action" : "outlined"} size="s" onClick={() => setAutoRefreshSeconds(30)}>30s</Button>
+            <Button view={autoRefreshSeconds === 60 ? "action" : "outlined"} size="s" onClick={() => setAutoRefreshSeconds(60)}>60s</Button>
+            {autoRefreshSeconds !== 0 && autoRefreshPausedUntilMs > nowMs ? (
+              <Button view="flat" size="s" onClick={resetAutoRefreshPause}>
+                Resume
+              </Button>
+            ) : null}
+            <Button
+              view="flat"
+              size="s"
+              onClick={() => {
+                resetAutoRefreshPause();
+                void refresh();
+              }}
+            >
+              Refresh
+            </Button>
+          </div>
         </div>
         <div className="row-tight">
           <Select
@@ -246,33 +339,27 @@ export function OperatorPage() {
               <div className="detail-block" data-testid="operator-artifacts">
                 <p className="muted">Artifacts</p>
                 {(selectedTaskDetail?.artifacts ?? []).map((a, idx) => (
-                  <div key={`artifact-${idx}`} className="incident-event">
-                    {"id" in (a as any) && "task_id" in (a as any) && String((a as any).storage_path ?? "").startsWith("local:") ? (
-                      <div className="row-tight">
-                        <Button
-                          size="s"
-                          view="outlined"
-                          onClick={() => {
-                            const taskId = String((a as any).task_id);
-                            const artifactId = String((a as any).id);
-                            void Api.downloadArtifact(taskId, artifactId).then(({ blob, filename }) => {
-                              const url = URL.createObjectURL(blob);
-                              const link = document.createElement("a");
-                              link.href = url;
-                              link.download = filename;
-                              document.body.appendChild(link);
-                              link.click();
-                              link.remove();
-                              URL.revokeObjectURL(url);
-                            }).catch((e) => setError(String(e)));
-                          }}
-                        >
-                          Download
-                        </Button>
-                      </div>
-                    ) : null}
-                    <pre className="json-code">{JSON.stringify(a, null, 2)}</pre>
-                  </div>
+                  <ArtifactTile
+                    key={`artifact-${idx}`}
+                    artifact={a}
+                    onDownload={(taskId, artifactId) =>
+                      Api.downloadArtifact(taskId, artifactId, String((a as any)?.metadata?.filename ?? ""))
+                        .then(({ blob, filename }) => {
+                          const url = URL.createObjectURL(blob);
+                          const link = document.createElement("a");
+                          link.href = url;
+                          link.download = filename;
+                          document.body.appendChild(link);
+                          link.click();
+                          link.remove();
+                          URL.revokeObjectURL(url);
+                        })
+                        .catch((e) => setError(String(e)))
+                    }
+                    notify={(level, message) => {
+                      if (level === "error") setError(message);
+                    }}
+                  />
                 ))}
               </div>
             ) : null}

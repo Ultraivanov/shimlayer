@@ -13,6 +13,7 @@ import type {
   TaskAuditEntry,
   TaskWithReview
 } from "../types";
+import { ArtifactTile } from "../components/ArtifactTile";
 
 const FORCE_STATUSES = ["queued", "claimed", "completed", "failed", "disputed", "refunded"];
 const TASK_TYPES = ["stuck_recovery", "quick_judgment"] as const;
@@ -205,6 +206,9 @@ export function OpsPage() {
   const [autoRefreshSeconds, setAutoRefreshSeconds] = useState<AutoRefreshSeconds>(
     () => Number(localStorage.getItem("ops.autoRefreshSeconds") ?? "30") as AutoRefreshSeconds
   );
+  const [autoRefreshPausedUntilMs, setAutoRefreshPausedUntilMs] = useState<number>(0);
+  const [autoRefreshFailureCount, setAutoRefreshFailureCount] = useState<number>(0);
+  const [autoRefreshLastError, setAutoRefreshLastError] = useState<string>("");
   const [isPageVisible, setIsPageVisible] = useState<boolean>(() => document.visibilityState === "visible");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isActionRunning, setIsActionRunning] = useState(false);
@@ -225,7 +229,8 @@ export function OpsPage() {
     applyText: "Confirm",
     danger: false
   });
-  const refreshRef = useRef<() => Promise<void>>();
+  const refreshRef = useRef<(() => Promise<{ ok: boolean; error?: string }>) | null>(null);
+  const refreshInFlightRef = useRef(false);
   const confirmHandlerRef = useRef<(() => void) | null>(null);
   const pendingManualReviewSelectRef = useRef<string | null>(null);
   const claimedManualReviewIdRef = useRef<string>("");
@@ -534,6 +539,20 @@ export function OpsPage() {
     }
   }
 
+  function formatDurationShort(ms: number): string {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    if (m <= 0) return `${s}s`;
+    return `${m}m ${String(s).padStart(2, "0")}s`;
+  }
+
+  function resetAutoRefreshPause() {
+    setAutoRefreshPausedUntilMs(0);
+    setAutoRefreshFailureCount(0);
+    setAutoRefreshLastError("");
+  }
+
   useEffect(() => {
     setIncidentOwnerDrafts((prev) => {
       const next = { ...prev };
@@ -756,7 +775,10 @@ export function OpsPage() {
     setTimeline(line);
   }
 
-  async function refresh() {
+  async function refresh(options: { source?: "manual" | "auto" } = {}): Promise<{ ok: boolean; error?: string }> {
+    if (refreshInFlightRef.current) return { ok: false, error: "refresh already in progress" };
+    refreshInFlightRef.current = true;
+    const source = options.source ?? "manual";
     setIsRefreshing(true);
     setError(null);
     try {
@@ -800,16 +822,21 @@ export function OpsPage() {
       const errors = (await Promise.all(jobs)).filter((msg): msg is string => Boolean(msg));
       if (errors.length > 0) {
         setError(errors[0]);
-        pushToast("error", `Refresh partially failed: ${errors[0]}`);
+        if (source !== "auto") pushToast("error", `Refresh partially failed: ${errors[0]}`);
+        return { ok: false, error: errors[0] };
       }
+      return { ok: true };
     } catch (e) {
-      setError(String(e));
-      pushToast("error", `Refresh failed: ${String(e)}`);
+      const msg = String(e);
+      setError(msg);
+      if (source !== "auto") pushToast("error", `Refresh failed: ${msg}`);
+      return { ok: false, error: msg };
     } finally {
       setIsRefreshing(false);
+      refreshInFlightRef.current = false;
     }
   }
-  refreshRef.current = refresh;
+  refreshRef.current = () => refresh({ source: "manual" });
 
   useEffect(() => {
     void refresh();
@@ -827,10 +854,22 @@ export function OpsPage() {
   useEffect(() => {
     if (autoRefreshSeconds === 0 || !isPageVisible) return;
     const timer = window.setInterval(() => {
-      void refreshRef.current?.();
+      if (Date.now() < autoRefreshPausedUntilMs) return;
+      void refresh({ source: "auto" }).then((res) => {
+        if (res.ok) {
+          if (autoRefreshFailureCount > 0 || autoRefreshLastError || autoRefreshPausedUntilMs > 0) resetAutoRefreshPause();
+          return;
+        }
+        const nextFailures = autoRefreshFailureCount + 1;
+        setAutoRefreshFailureCount(nextFailures);
+        setAutoRefreshLastError(res.error ?? "unknown error");
+        const pauseSeconds = Math.min(300, 15 * 2 ** Math.min(4, nextFailures - 1));
+        setAutoRefreshPausedUntilMs(Date.now() + pauseSeconds * 1000);
+        pushToast("error", `Auto-refresh failed; pausing for ${pauseSeconds}s`);
+      });
     }, autoRefreshSeconds * 1000);
     return () => window.clearInterval(timer);
-  }, [autoRefreshSeconds, isPageVisible]);
+  }, [autoRefreshSeconds, isPageVisible, autoRefreshFailureCount, autoRefreshLastError, autoRefreshPausedUntilMs]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
@@ -882,29 +921,39 @@ export function OpsPage() {
     if (!manualReviewClaimState.isMine) return;
     if (!manualReviewAutoRenew) return;
     if (lockRenewInFlightRef.current) return;
+    if (lockRenewBackoffUntilMs && nowMs < lockRenewBackoffUntilMs) return;
     const remainingMs = manualReviewClaimState.claimedUntilMs - nowMs;
     if (!Number.isFinite(remainingMs) || remainingMs <= 0) return;
-    if (remainingMs > 25_000) return;
-    if (nowMs - lockRenewLastAtRef.current < 5_000) return;
+    if (remainingMs > 60_000) return;
+    if (nowMs - lockRenewLastAtRef.current < 20_000) return;
     lockRenewLastAtRef.current = nowMs;
     lockRenewInFlightRef.current = true;
+    setIsLockRenewing(true);
     void Api.claimManualReview(selectedFlowId)
       .then((task) => {
         if (task && task.id === selectedFlowId) {
           setSelectedFlow(task);
           setFlows((prev) => prev.map((t) => (t.id === selectedFlowId ? ({ ...(t as any), review: task.review } as any) : t)));
+          setLockRenewLastOkAtMs(nowMs);
+          setLockRenewLastError("");
+          setLockRenewBackoffUntilMs(0);
         }
       })
       .catch((e) => {
-        pushToast("error", `Lock renew failed: ${String(e)}`);
+        const msg = String(e);
+        setLockRenewLastError(msg);
+        setLockRenewBackoffUntilMs(nowMs + 60_000);
+        pushToast("error", "Auto-renew failed; pausing for 60s");
         void refreshRef.current?.();
       })
       .finally(() => {
         lockRenewInFlightRef.current = false;
+        setIsLockRenewing(false);
       });
   }, [
     isPageVisible,
     manualReviewAutoRenew,
+    lockRenewBackoffUntilMs,
     manualReviewClaimState.claimedUntilMs,
     manualReviewClaimState.isMine,
     nowMs,
@@ -1380,13 +1429,42 @@ export function OpsPage() {
           <div className="row-tight">
             <span className="muted">Role: <strong>{role}</strong></span>
             <span className="muted">
-              Auto: {autoRefreshSeconds === 0 ? "off" : `${autoRefreshSeconds}s`} {isPageVisible ? "" : "(paused)"}
+              {(() => {
+                const remainingMs = Math.max(0, autoRefreshPausedUntilMs - nowMs);
+                const base = autoRefreshSeconds === 0 ? "off" : `${autoRefreshSeconds}s`;
+                const suffix =
+                  autoRefreshSeconds === 0
+                    ? ""
+                    : remainingMs > 0
+                      ? `(paused ${formatDurationShort(remainingMs)})`
+                      : isPageVisible
+                        ? ""
+                        : "(paused)";
+                const hint = remainingMs > 0 && autoRefreshLastError ? ` · ${autoRefreshLastError}` : "";
+                return (
+                  <span title={autoRefreshLastError || undefined}>
+                    Auto: {base} {suffix}{hint}
+                  </span>
+                );
+              })()}
             </span>
             <Button view={autoRefreshSeconds === 0 ? "action" : "outlined"} onClick={() => setAutoRefreshSeconds(0)}>Off</Button>
             <Button view={autoRefreshSeconds === 15 ? "action" : "outlined"} onClick={() => setAutoRefreshSeconds(15)}>15s</Button>
             <Button view={autoRefreshSeconds === 30 ? "action" : "outlined"} onClick={() => setAutoRefreshSeconds(30)}>30s</Button>
             <Button view={autoRefreshSeconds === 60 ? "action" : "outlined"} onClick={() => setAutoRefreshSeconds(60)}>60s</Button>
-            <Button view="flat" onClick={() => void refresh()} loading={isRefreshing}>
+            {autoRefreshSeconds !== 0 && autoRefreshPausedUntilMs > nowMs ? (
+              <Button view="flat" onClick={resetAutoRefreshPause}>
+                Resume
+              </Button>
+            ) : null}
+            <Button
+              view="flat"
+              onClick={() => {
+                resetAutoRefreshPause();
+                void refresh({ source: "manual" });
+              }}
+              loading={isRefreshing}
+            >
               Refresh
             </Button>
           </div>
@@ -1599,7 +1677,7 @@ export function OpsPage() {
                     }
                     pendingManualReviewSelectRef.current = task.id;
                   })
-                  .then(refresh)
+                  .then(() => refresh({ source: "manual" }))
                   .catch((e) => pushToast("error", `Claim next failed: ${String(e)}`))
                   .finally(() => setIsClaimRunning(false));
               }}
@@ -1658,9 +1736,47 @@ export function OpsPage() {
               data-testid="ops-manual-auto-renew"
               onClick={() => setManualReviewAutoRenew((v) => !v)}
               disabled={isRefreshing}
-              title="Automatically renew your lock when it is close to expiring"
+              title={
+                !manualReviewAutoRenew
+                  ? "Auto-renew is off"
+                  : lockRenewBackoffUntilMs && nowMs < lockRenewBackoffUntilMs
+                    ? `Auto-renew paused for ${formatRemaining(lockRenewBackoffUntilMs - nowMs)}`
+                    : manualReviewClaimState.isMine
+                      ? "Auto-renew is on (renews when <60s remaining)"
+                      : "Auto-renew is on (will only run for locks claimed by you)"
+              }
             >
               Auto-renew
+            </Button>
+            <span
+              className="muted mono"
+              data-testid="ops-manual-auto-renew-status"
+              title={
+                manualReviewAutoRenew
+                  ? `Auto-renew status. Last ok: ${lockRenewLastOkAtMs ? new Date(lockRenewLastOkAtMs).toLocaleTimeString() : "never"}`
+                    + (lockRenewLastError ? ` · last error: ${lockRenewLastError}` : "")
+                  : "Auto-renew is off"
+              }
+              style={{ whiteSpace: "nowrap" }}
+            >
+              {manualReviewAutoRenew
+                ? (lockRenewBackoffUntilMs && nowMs < lockRenewBackoffUntilMs
+                  ? `auto-renew: paused ${formatRemaining(lockRenewBackoffUntilMs - nowMs)}`
+                  : isLockRenewing
+                    ? "auto-renew: renewing…"
+                    : manualReviewClaimState.isMine
+                      ? "auto-renew: on"
+                      : "auto-renew: idle")
+                : "auto-renew: off"}
+            </span>
+            <Button
+              view="outlined"
+              data-testid="ops-manual-renew-now"
+              onClick={() => void renewSelectedManualReviewLock()}
+              disabled={!selectedFlowId || isClaimRunning || isRefreshing || !manualReviewClaimState.isMine}
+              title={!manualReviewClaimState.isMine ? "Claim the flow to renew its lock" : "Renew lock now"}
+            >
+              Renew now
             </Button>
             <Button
               view="outlined"
@@ -2208,16 +2324,13 @@ export function OpsPage() {
               <div className="list">
                 {(selectedFlow.artifacts ?? []).length === 0 ? <p className="muted">No artifacts.</p> : null}
                 {(selectedFlow.artifacts ?? []).map((artifact, idx) => (
-                  <div key={`artifact-${idx}`} className="incident-event">
-                    {canDownloadArtifact && "id" in (artifact as any) && "task_id" in (artifact as any) && String((artifact as any).storage_path ?? "").startsWith("local:") ? (
-                      <div className="row-tight">
-                        <Button
-                          size="s"
-                          view="outlined"
-                          onClick={() => {
-                            const taskId = String((artifact as any).task_id);
-                            const artifactId = String((artifact as any).id);
-                            void Api.downloadOpsArtifact(taskId, artifactId)
+                  <ArtifactTile
+                    key={`artifact-${idx}`}
+                    artifact={artifact}
+                    onDownload={
+                      canDownloadArtifact
+                        ? (taskId, artifactId) =>
+                            Api.downloadOpsArtifact(taskId, artifactId, String((artifact as any)?.metadata?.filename ?? ""))
                               .then(({ blob, filename }) => {
                                 const url = URL.createObjectURL(blob);
                                 const link = document.createElement("a");
@@ -2228,15 +2341,13 @@ export function OpsPage() {
                                 link.remove();
                                 URL.revokeObjectURL(url);
                               })
-                              .catch((e) => pushToast("error", `Download failed: ${String(e)}`));
-                          }}
-                        >
-                          Download
-                        </Button>
-                      </div>
-                    ) : null}
-                    <pre className="json-code">{prettyJson(artifact)}</pre>
-                  </div>
+                              .catch((e) => pushToast("error", `Download failed: ${String(e)}`))
+                        : undefined
+                    }
+                    notify={(level, message) => {
+                      if (level === "error") pushToast("error", message);
+                    }}
+                  />
                 ))}
               </div>
             ) : null}

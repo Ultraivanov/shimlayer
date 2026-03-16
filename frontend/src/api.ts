@@ -70,8 +70,23 @@ async function http<T>(path: string, init: RequestInit = {}, admin = false): Pro
 
 function parseDispositionFilename(value: string | null): string | null {
   if (!value) return null;
-  const m = value.match(/filename="([^"]+)"/i);
-  if (m && m[1]) return m[1];
+  // RFC 5987 / RFC 6266-ish:
+  // - filename*=UTF-8''... (percent-encoded)
+  // - filename="..."
+  // - filename=...
+  const star = value.match(/filename\\*\\s*=\\s*UTF-8''([^;]+)/i) ?? value.match(/filename\\*\\s*=\\s*([^;]+)/i);
+  if (star && star[1]) {
+    const raw = star[1].trim().replace(/^\"|\"$/g, "");
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      return raw;
+    }
+  }
+  const quoted = value.match(/filename\\s*=\\s*\"([^\"]+)\"/i);
+  if (quoted && quoted[1]) return quoted[1];
+  const bare = value.match(/filename\\s*=\\s*([^;]+)/i);
+  if (bare && bare[1]) return bare[1].trim().replace(/^\"|\"$/g, "");
   return null;
 }
 
@@ -116,18 +131,18 @@ export const Api = {
     if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
     return (await res.json()) as unknown;
   },
-  downloadArtifact: async (taskId: string, artifactId: string) => {
+  downloadArtifact: async (taskId: string, artifactId: string, fallbackFilename?: string) => {
     const headers = new Headers();
     headers.set("X-API-Key", config.apiKey);
     const res = await fetch(`${config.baseUrl}/v1/tasks/${taskId}/artifacts/${artifactId}/download`, { headers });
     if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
     const blob = await res.blob();
-    const filename = parseDispositionFilename(res.headers.get("Content-Disposition")) ?? "artifact.bin";
+    const filename = parseDispositionFilename(res.headers.get("Content-Disposition")) ?? fallbackFilename ?? "artifact.bin";
     const contentType = res.headers.get("Content-Type") ?? "application/octet-stream";
     const checksum = res.headers.get("X-Checksum-Sha256") ?? "";
     return { blob, filename, contentType, checksum };
   },
-  downloadOpsArtifact: async (taskId: string, artifactId: string) => {
+  downloadOpsArtifact: async (taskId: string, artifactId: string, fallbackFilename?: string) => {
     const headers = new Headers();
     headers.set("X-API-Key", config.apiKey);
     headers.set("X-Admin-Key", config.adminKey);
@@ -136,7 +151,7 @@ export const Api = {
     const res = await fetch(`${config.baseUrl}/v1/ops/flows/${taskId}/artifacts/${artifactId}/download`, { headers });
     if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
     const blob = await res.blob();
-    const filename = parseDispositionFilename(res.headers.get("Content-Disposition")) ?? "artifact.bin";
+    const filename = parseDispositionFilename(res.headers.get("Content-Disposition")) ?? fallbackFilename ?? "artifact.bin";
     const contentType = res.headers.get("Content-Type") ?? "application/octet-stream";
     const checksum = res.headers.get("X-Checksum-Sha256") ?? "";
     return { blob, filename, contentType, checksum };

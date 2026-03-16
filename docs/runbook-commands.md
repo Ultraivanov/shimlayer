@@ -83,6 +83,12 @@ curl -sS http://localhost:8000/v1/ops/observability/metrics \
 python -m app.tools.cleanup_db
 ```
 
+Retention settings (env vars):
+- `SHIMLAYER_RETENTION_WEBHOOK_DELIVERIES_DAYS` (default `30`)
+- `SHIMLAYER_RETENTION_SUCCEEDED_JOBS_DAYS` (default `7`)
+- `SHIMLAYER_RETENTION_API_RATE_WINDOWS_HOURS` (default `48`)
+- `SHIMLAYER_RETENTION_ARTIFACTS_DAYS` (default `30`, also deletes `local:` artifact files)
+
 ## 13. Stop Stack
 ```bash
 docker compose down -v

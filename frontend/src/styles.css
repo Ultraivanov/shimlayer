@@ -563,6 +563,15 @@ p {
   background: #f9fbff;
 }
 
+.artifact-tile {
+  display: grid;
+  gap: 6px;
+}
+
+.artifact-json {
+  margin-top: 8px;
+}
+
 .dlq-head {
   display: flex;
   justify-content: space-between;

@@ -73,6 +73,44 @@ async function seedCompletedTask(request: APIRequestContext, suffix: string): Pr
   return taskId;
 }
 
+async function seedCompletedTaskWithLocalArtifact(request: APIRequestContext, suffix: string): Promise<{ taskId: string; filename: string }> {
+  await ensurePurchased(request, `e2e-purchase-local-${suffix}-${Date.now()}`);
+  const created = await request.post(`${API_URL}/v1/tasks`, {
+    headers: apiHeaders(),
+    data: {
+      task_type: "stuck_recovery",
+      context: { logs: `local-${suffix}` },
+      sla_seconds: 120
+    }
+  });
+  expect(created.ok()).toBeTruthy();
+  const taskId = (await created.json()).id as string;
+
+  const claimed = await request.post(`${API_URL}/v1/tasks/${taskId}/claim`, { headers: apiHeaders() });
+  expect(claimed.ok()).toBeTruthy();
+
+  const filename = `ops-download-${suffix}.log`;
+  const content = Buffer.from(`local artifact for ${taskId}\n${new Date().toISOString()}\n`, "utf-8");
+  const uploaded = await request.post(`${API_URL}/v1/tasks/${taskId}/artifacts/upload`, {
+    headers: apiHeaders(),
+    data: {
+      artifact_type: "logs",
+      content_base64: content.toString("base64"),
+      filename,
+      content_type: "text/plain",
+      metadata: { source: "e2e-ops-download" }
+    }
+  });
+  expect(uploaded.ok()).toBeTruthy();
+
+  const completed = await request.post(`${API_URL}/v1/tasks/${taskId}/complete`, {
+    headers: apiHeaders(),
+    data: { result: { action_summary: "fixed", next_step: "resume" } }
+  });
+  expect(completed.ok()).toBeTruthy();
+  return { taskId, filename };
+}
+
 async function seedManualRequiredTask(request: APIRequestContext, suffix: string): Promise<string> {
   await ensurePurchased(request, `e2e-purchase-manual-${suffix}-${Date.now()}`);
   const created = await request.post(`${API_URL}/v1/tasks`, {
@@ -189,6 +227,30 @@ test.describe("Ops smoke", () => {
 
     await expect(page.locator('[data-testid="ops-flow-inspector"]')).toBeVisible();
     await expect(page.locator('[data-testid="ops-inspector-task-id"]')).toContainText(taskId);
+  });
+
+  test("download flow bundle and local artifact via UI", async ({ page, request }) => {
+    const seeded = await seedCompletedTaskWithLocalArtifact(request, "download");
+    await openOps(page);
+    await waitForFlowRows(page, 1);
+
+    const targetRow = page.locator(`[data-testid="ops-flow-row"][data-task-id="${seeded.taskId}"]`);
+    await expect(targetRow).toBeVisible({ timeout: 20_000 });
+    await targetRow.click();
+
+    // Bundle
+    const bundleDownload = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download bundle" }).click();
+    const bundle = await bundleDownload;
+    expect(bundle.suggestedFilename()).toBe(`flow-${seeded.taskId}.zip`);
+
+    // Artifact (local)
+    await page.getByRole("button", { name: "Artifacts" }).click();
+    await expect(page.locator('[data-testid="artifact-tile"]').first()).toBeVisible({ timeout: 20_000 });
+    const artifactDownload = page.waitForEvent("download");
+    await page.locator('[data-testid="artifact-download"]').first().click();
+    const artifact = await artifactDownload;
+    expect(artifact.suggestedFilename()).toBe(seeded.filename);
   });
 
   test("single force-status action works via confirm dialog", async ({ page, request }) => {

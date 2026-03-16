@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     shimlayer_retention_webhook_deliveries_days: int = 30
     shimlayer_retention_succeeded_jobs_days: int = 7
     shimlayer_retention_api_rate_windows_hours: int = 48
+    shimlayer_retention_artifacts_days: int = 30
     shimlayer_stripe_secret_key: str | None = None
     shimlayer_stripe_publishable_key: str | None = None
     shimlayer_stripe_webhook_secret: str | None = None
@@ -73,6 +74,8 @@ class Settings(BaseSettings):
             warnings.append("SHIMLAYER_AUTO_CHECK_OPENAI_MAX_SNIPPET_LINES should be > 0.")
         if self.shimlayer_retention_webhook_deliveries_days < 1:
             warnings.append("SHIMLAYER_RETENTION_WEBHOOK_DELIVERIES_DAYS should be >= 1.")
+        if self.shimlayer_retention_artifacts_days < 1:
+            warnings.append("SHIMLAYER_RETENTION_ARTIFACTS_DAYS should be >= 1.")
         if repo == "postgres" and self.shimlayer_db_dsn.strip() == "":
             warnings.append("SHIMLAYER_DB_DSN is empty while SHIMLAYER_REPOSITORY=postgres.")
         return warnings

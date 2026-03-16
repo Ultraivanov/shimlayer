@@ -77,3 +77,20 @@ def load_local_artifact(*, base_dir: str, storage_path: str) -> bytes:
     full_path = _ensure_within_base(base, base / rel_path)
     return full_path.read_bytes()
 
+
+def delete_local_artifact(*, base_dir: str, storage_path: str) -> bool:
+    if not storage_path.startswith(LOCAL_SCHEME_PREFIX):
+        return False
+    rel = storage_path.removeprefix(LOCAL_SCHEME_PREFIX).lstrip("/")
+    if not rel:
+        return False
+    rel_path = Path(rel)
+    if rel_path.is_absolute() or ".." in rel_path.parts:
+        return False
+    base = Path(base_dir)
+    full_path = _ensure_within_base(base, base / rel_path)
+    try:
+        full_path.unlink()
+        return True
+    except FileNotFoundError:
+        return False
