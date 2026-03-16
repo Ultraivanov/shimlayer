@@ -1,0 +1,93 @@
+services:
+  migrate:
+    build: .
+    command: ["python", "-m", "app.tools.migrate"]
+    environment:
+      - SHIMLAYER_REPOSITORY=postgres
+      - SHIMLAYER_DB_DSN=postgresql://shim:shim@postgres:5432/shimlayer
+    depends_on:
+      - postgres
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - SHIMLAYER_REPOSITORY=postgres
+      - SHIMLAYER_DB_DSN=postgresql://shim:shim@postgres:5432/shimlayer
+      - SHIMLAYER_ADMIN_API_KEY=dev-admin-key
+      - SHIMLAYER_WEBHOOK_SECRET=dev-webhook-secret
+    depends_on:
+      - postgres
+      - migrate
+
+  worker:
+    build: .
+    command: ["python", "-m", "app.workers.webhook_worker"]
+    environment:
+      - SHIMLAYER_REPOSITORY=postgres
+      - SHIMLAYER_DB_DSN=postgresql://shim:shim@postgres:5432/shimlayer
+      - SHIMLAYER_ADMIN_API_KEY=dev-admin-key
+      - SHIMLAYER_WEBHOOK_SECRET=dev-webhook-secret
+      - SHIMLAYER_WEBHOOK_TIMEOUT_SECONDS=5
+      - SHIMLAYER_WEBHOOK_MAX_ATTEMPTS=5
+    depends_on:
+      - postgres
+      - migrate
+
+  openai-resume-worker:
+    build: .
+    command: ["python", "-m", "app.workers.openai_resume_worker"]
+    environment:
+      - SHIMLAYER_REPOSITORY=postgres
+      - SHIMLAYER_DB_DSN=postgresql://shim:shim@postgres:5432/shimlayer
+      - SHIMLAYER_ADMIN_API_KEY=dev-admin-key
+      - SHIMLAYER_WEBHOOK_SECRET=dev-webhook-secret
+    depends_on:
+      - postgres
+      - migrate
+
+  cleanup:
+    build: .
+    command: ["python", "-m", "app.tools.cleanup_db"]
+    environment:
+      - SHIMLAYER_REPOSITORY=postgres
+      - SHIMLAYER_DB_DSN=postgresql://shim:shim@postgres:5432/shimlayer
+      - SHIMLAYER_ADMIN_API_KEY=dev-admin-key
+      - SHIMLAYER_RETENTION_WEBHOOK_DELIVERIES_DAYS=30
+      - SHIMLAYER_RETENTION_SUCCEEDED_JOBS_DAYS=7
+      - SHIMLAYER_RETENTION_API_RATE_WINDOWS_HOURS=48
+    depends_on:
+      - postgres
+      - migrate
+    profiles:
+      - maintenance
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8000
+        VITE_API_KEY: demo-key
+        VITE_ADMIN_KEY: dev-admin-key
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+    profiles:
+      - ui
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: shim
+      POSTGRES_PASSWORD: shim
+      POSTGRES_DB: shimlayer
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

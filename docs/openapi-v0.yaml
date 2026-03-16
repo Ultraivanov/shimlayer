@@ -1,0 +1,1768 @@
+openapi: 3.1.0
+info:
+  title: ShimLayer API
+  version: 0.1.0
+  description: API for HITL fallback tasks in agentic AI workflows.
+servers:
+  - url: https://api.shimlayer.com
+security:
+  - ApiKeyAuth: []
+tags:
+  - name: Tasks
+  - name: Artifacts
+  - name: Judgments
+  - name: Billing
+  - name: System
+  - name: Ops
+  - name: Incidents
+  - name: Finance
+  - name: Observability
+
+paths:
+  /v1/tasks:
+    post:
+      tags: [Tasks]
+      summary: Create a new task
+      operationId: createTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskRequest"
+      responses:
+        "201":
+          description: Task created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /v1/tasks/{taskId}:
+    get:
+      tags: [Tasks]
+      summary: Get task details
+      operationId: getTask
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: Task returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskWithReview"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/tasks/{taskId}/claim:
+    post:
+      tags: [Tasks]
+      summary: Claim task for worker execution
+      operationId: claimTask
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: Task claimed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "409":
+          description: Task already claimed or unavailable
+
+  /v1/tasks/{taskId}/complete:
+    post:
+      tags: [Tasks]
+      summary: Complete task with structured result
+      operationId: completeTask
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompleteTaskRequest"
+      responses:
+        "200":
+          description: Task completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Invalid task state or missing/low-quality proof artifact
+
+  /v1/tasks/{taskId}/proof:
+    post:
+      tags: [Artifacts]
+      summary: Register proof artifact metadata
+      operationId: registerProofArtifact
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateArtifactRequest"
+      responses:
+        "201":
+          description: Artifact metadata stored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artifact"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/tasks/{taskId}/artifacts/upload:
+    post:
+      tags: [Artifacts]
+      summary: Upload artifact content (base64) to local storage
+      operationId: uploadArtifact
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadArtifactRequest"
+      responses:
+        "201":
+          description: Artifact stored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artifact"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/tasks/{taskId}/artifacts/upload-multipart:
+    post:
+      tags: [Artifacts]
+      summary: Upload artifact content (multipart/form-data) to local storage
+      operationId: uploadArtifactMultipart
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [artifact_type, file]
+              properties:
+                artifact_type:
+                  type: string
+                  enum: [screenshot, logs, json_payload]
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Artifact stored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artifact"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/tasks/{taskId}/artifacts/{artifactId}/download:
+    get:
+      tags: [Artifacts]
+      summary: Download artifact content (local storage)
+      operationId: downloadArtifact
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+        - name: artifactId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Artifact bytes
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/tasks/{taskId}/download:
+    get:
+      tags: [Tasks]
+      summary: Download task bundle (task + timeline + artifacts)
+      operationId: downloadTaskBundle
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: Task bundle zip
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/tasks/{taskId}/refund:
+    post:
+      tags: [Tasks]
+      summary: Refund task and restore one flow credit
+      operationId: refundTask
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: Task refunded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "409":
+          description: Refund is not allowed for current task state
+
+  /v1/judgments:
+    post:
+      tags: [Judgments]
+      summary: Create quick judgment task
+      operationId: createQuickJudgment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateJudgmentRequest"
+      responses:
+        "201":
+          description: Judgment task created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+
+  /v1/healthz:
+    get:
+      tags: [System]
+      summary: Liveness probe
+      operationId: healthz
+      responses:
+        "200":
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, timestamp]
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /v1/readyz:
+    get:
+      tags: [System]
+      summary: Readiness probe (API + repository)
+      operationId: readyz
+      responses:
+        "200":
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, timestamp]
+                properties:
+                  status:
+                    type: string
+                    example: ready
+                  timestamp:
+                    type: string
+                    format: date-time
+        "503":
+          description: Service is not ready
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [detail]
+                properties:
+                  detail:
+                    type: string
+
+  /v1/webhooks/task.updated:
+    post:
+      tags: [Tasks]
+      summary: Webhook endpoint contract for task status updates
+      operationId: taskUpdatedWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskUpdatedEvent"
+      responses:
+        "204":
+          description: Event accepted
+
+  /v1/webhooks/dlq/{deadLetterId}/requeue:
+    post:
+      tags: [Tasks]
+      summary: Requeue dead-letter webhook item
+      operationId: requeueDeadLetter
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+        - name: deadLetterId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Requeued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requeued]
+                properties:
+                  requeued:
+                    type: boolean
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "403":
+          description: Forbidden
+
+  /v1/billing/topup:
+    post:
+      tags: [Billing]
+      summary: Register account top-up
+      operationId: topUpBalance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TopUpRequest"
+      responses:
+        "200":
+          description: Balance updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalanceResponse"
+
+  /v1/billing/balance:
+    get:
+      tags: [Billing]
+      summary: Get current account balance and flow credits
+      operationId: getBalance
+      responses:
+        "200":
+          description: Balance returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalanceResponse"
+
+  /v1/billing/packages:
+    get:
+      tags: [Billing]
+      summary: List available prepaid packages
+      operationId: listPackages
+      responses:
+        "200":
+          description: Packages returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PackageInfo"
+
+  /v1/billing/packages/purchase:
+    post:
+      tags: [Billing]
+      summary: Purchase a flow package
+      operationId: purchasePackage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PackagePurchaseRequest"
+      responses:
+        "200":
+          description: Package purchased
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PackagePurchaseResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /v1/ops/metrics:
+    get:
+      tags: [Ops]
+      summary: Get operational metrics snapshot
+      operationId: getOpsMetrics
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+      responses:
+        "200":
+          description: Metrics returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsMetricsResponse"
+        "403":
+          description: Forbidden
+
+  /v1/ops/dlq:
+    get:
+      tags: [Ops]
+      summary: List webhook dead-letter items
+      operationId: listWebhookDeadLetters
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: Dead-letter entries returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WebhookDeadLetter"
+        "403":
+          description: Forbidden
+
+  /v1/ops/incidents:
+    get:
+      tags: [Incidents]
+      summary: List incidents
+      operationId: listOpsIncidents
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+        - name: status_filter
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+      responses:
+        "200":
+          description: Incidents returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OpsIncident"
+        "403":
+          description: Forbidden
+    post:
+      tags: [Incidents]
+      summary: Create incident
+      operationId: createOpsIncident
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOpsIncidentRequest"
+      responses:
+        "201":
+          description: Incident created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsIncident"
+        "403":
+          description: Forbidden
+
+  /v1/ops/incidents/{incident_id}:
+    patch:
+      tags: [Incidents]
+      summary: Update incident
+      operationId: updateOpsIncident
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+        - name: incident_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOpsIncidentRequest"
+      responses:
+        "200":
+          description: Incident updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsIncident"
+        "403":
+          description: Forbidden
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/ops/incidents/{incident_id}/events:
+    get:
+      tags: [Incidents]
+      summary: List incident events
+      operationId: listOpsIncidentEvents
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+        - name: incident_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 100
+            minimum: 1
+            maximum: 300
+      responses:
+        "200":
+          description: Incident events returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OpsIncidentEvent"
+        "403":
+          description: Forbidden
+
+  /v1/ops/incidents/scan:
+    post:
+      tags: [Incidents]
+      summary: Auto-create SLA breach incident if threshold exceeded
+      operationId: scanOpsIncidents
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpsIncidentScanRequest"
+      responses:
+        "200":
+          description: Incident created or null
+          content:
+            application/json:
+              schema:
+                nullable: true
+                allOf:
+                  - $ref: "#/components/schemas/OpsIncident"
+        "403":
+          description: Forbidden
+
+  /v1/ops/finance/ledger:
+    get:
+      tags: [Finance]
+      summary: List ledger entries
+      operationId: listOpsLedger
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 100
+            minimum: 1
+            maximum: 1000
+        - name: account_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Ledger entries returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LedgerEntry"
+        "403":
+          description: Forbidden
+
+  /v1/ops/finance/margin:
+    get:
+      tags: [Finance]
+      summary: Get margin summary
+      operationId: getOpsMargin
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+      responses:
+        "200":
+          description: Margin summary returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsMarginSummary"
+        "403":
+          description: Forbidden
+
+  /v1/ops/observability:
+    get:
+      tags: [Observability]
+      summary: Get observability snapshot
+      operationId: getOpsObservability
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+      responses:
+        "200":
+          description: Observability snapshot returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsObservabilityResponse"
+        "403":
+          description: Forbidden
+
+  /v1/ops/observability/metrics:
+    get:
+      tags: [Observability]
+      summary: Get observability metrics in Prometheus text format
+      operationId: getOpsObservabilityMetricsText
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+      responses:
+        "200":
+          description: Prometheus-compatible metrics
+          content:
+            text/plain:
+              schema:
+                type: string
+        "403":
+          description: Forbidden
+
+  /v1/ops/flows:
+    get:
+      tags: [Ops]
+      summary: List ops flows
+      operationId: listOpsFlows
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 100
+            minimum: 1
+            maximum: 500
+        - name: status_filter
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: task_type
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: only_problem
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: only_sla_breach
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: only_manual_review
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Ops flow list returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+        "403":
+          description: Forbidden
+
+  /v1/ops/manual-review:
+    get:
+      tags: [Ops]
+      summary: List tasks requiring manual review
+      operationId: listOpsManualReview
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 100
+            minimum: 1
+            maximum: 500
+        - name: status_filter
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: task_type
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Manual review queue returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TaskWithReview"
+        "403":
+          description: Forbidden
+
+  /v1/ops/flows/{task_id}:
+    get:
+      tags: [Ops]
+      summary: Get ops flow details
+      operationId: getOpsFlow
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Ops flow returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskWithReview"
+        "403":
+          description: Forbidden
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/ops/flows/{task_id}/download:
+    get:
+      tags: [Ops]
+      summary: Download flow bundle (task + audit + timeline + artifacts)
+      operationId: opsDownloadFlowBundle
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Flow bundle zip
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        "403":
+          description: Forbidden
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/ops/flows/{task_id}/artifacts/{artifact_id}/download:
+    get:
+      tags: [Ops]
+      summary: Download artifact content as ops (local storage)
+      operationId: opsDownloadArtifact
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: artifact_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Artifact bytes
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "403":
+          description: Forbidden
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/ops/flows/{task_id}/audit:
+    get:
+      tags: [Ops]
+      summary: List flow audit entries
+      operationId: listOpsFlowAudit
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+      responses:
+        "200":
+          description: Flow audit returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OpsTaskAuditEntry"
+        "403":
+          description: Forbidden
+
+  /v1/ops/flows/{task_id}/timeline:
+    get:
+      tags: [Ops]
+      summary: Build flow timeline
+      operationId: getOpsFlowTimeline
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Flow timeline returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OpsTimelineEvent"
+        "403":
+          description: Forbidden
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/ops/flows/{task_id}/actions:
+    post:
+      tags: [Ops]
+      summary: Execute single ops action for flow
+      operationId: postOpsFlowAction
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpsTaskActionRequest"
+      responses:
+        "200":
+          description: Action applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsTaskActionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          description: Forbidden
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Conflict
+
+  /v1/ops/flows/bulk-actions:
+    post:
+      tags: [Ops]
+      summary: Execute bulk ops action
+      operationId: postOpsFlowBulkAction
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpsBulkActionRequest"
+      responses:
+        "200":
+          description: Bulk action result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsBulkActionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          description: Forbidden
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  parameters:
+    TaskId:
+      name: taskId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    AdminKey:
+      name: X-Admin-Key
+      in: header
+      required: true
+      schema:
+        type: string
+    AdminRole:
+      name: X-Admin-Role
+      in: header
+      required: true
+      schema:
+        type: string
+        enum: [ops_agent, ops_manager, finance, admin]
+    AdminUser:
+      name: X-Admin-User
+      in: header
+      required: true
+      schema:
+        type: string
+
+  responses:
+    BadRequest:
+      description: Invalid request payload
+    Unauthorized:
+      description: Authentication failed
+    TooManyRequests:
+      description: API rate limit exceeded for the current plan
+    NotFound:
+      description: Resource not found
+
+  schemas:
+    CreateTaskRequest:
+      type: object
+      required: [task_type, context, sla_seconds]
+      properties:
+        task_type:
+          type: string
+          enum: [stuck_recovery, quick_judgment]
+        context:
+          type: object
+          additionalProperties: true
+        sla_seconds:
+          type: integer
+          minimum: 30
+          maximum: 900
+        max_price_usd:
+          type: number
+          format: float
+          default: 0.48
+        callback_url:
+          type: string
+          format: uri
+          nullable: true
+
+    CompleteTaskRequest:
+      type: object
+      required: [result]
+      properties:
+        result:
+          oneOf:
+            - $ref: "#/components/schemas/StuckRecoveryResult"
+            - $ref: "#/components/schemas/QuickJudgmentResult"
+        worker_note:
+          type: string
+          maxLength: 500
+
+    StuckRecoveryResult:
+      type: object
+      required: [action_summary, next_step]
+      properties:
+        action_summary:
+          type: string
+          maxLength: 2000
+        next_step:
+          type: string
+          maxLength: 1000
+
+    QuickJudgmentResult:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [yes, no]
+        note:
+          type: string
+          maxLength: 300
+
+    CreateArtifactRequest:
+      type: object
+      required: [artifact_type, storage_path]
+      properties:
+        artifact_type:
+          type: string
+          enum: [screenshot, logs, json_payload]
+        storage_path:
+          type: string
+        checksum_sha256:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    UploadArtifactRequest:
+      type: object
+      required: [artifact_type, content_base64]
+      properties:
+        artifact_type:
+          type: string
+          enum: [screenshot, logs, json_payload]
+        content_base64:
+          type: string
+          description: Base64-encoded content bytes
+        filename:
+          type: string
+          nullable: true
+        content_type:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+
+    CreateJudgmentRequest:
+      type: object
+      required: [context, sla_seconds]
+      properties:
+        context:
+          type: object
+          additionalProperties: true
+        sla_seconds:
+          type: integer
+          minimum: 30
+          maximum: 600
+        callback_url:
+          type: string
+          format: uri
+          nullable: true
+
+    TopUpRequest:
+      type: object
+      required: [amount_usd, reference]
+      properties:
+        amount_usd:
+          type: number
+          minimum: 1
+        reference:
+          type: string
+          description: External payment reference
+
+    BalanceResponse:
+      type: object
+      required: [account_id, balance_usd, flow_credits]
+      properties:
+        account_id:
+          type: string
+          format: uuid
+        balance_usd:
+          type: number
+        flow_credits:
+          type: integer
+
+    PackagePurchaseRequest:
+      type: object
+      required: [package_code, reference]
+      properties:
+        package_code:
+          type: string
+          enum: [indie_entry_150, growth_2000, scale_10000]
+        reference:
+          type: string
+
+    PackagePurchaseResponse:
+      type: object
+      required:
+        [account_id, package_code, purchased_flows, remaining_flows, charged_usd]
+      properties:
+        account_id:
+          type: string
+          format: uuid
+        package_code:
+          type: string
+        purchased_flows:
+          type: integer
+        remaining_flows:
+          type: integer
+        charged_usd:
+          type: number
+
+    PackageInfo:
+      type: object
+      required: [code, flows, price_usd, unit_price_usd, active]
+      properties:
+        code:
+          type: string
+        flows:
+          type: integer
+        price_usd:
+          type: number
+        unit_price_usd:
+          type: number
+        active:
+          type: boolean
+
+    OpsMetricsResponse:
+      type: object
+      required:
+        [queue_pending, queue_processing, queue_total, webhook_delivery_total, webhook_delivery_success_rate, webhook_retry_rate, webhook_dlq_count, manual_review_pending]
+      properties:
+        queue_pending:
+          type: integer
+        queue_processing:
+          type: integer
+        queue_total:
+          type: integer
+        webhook_delivery_total:
+          type: integer
+        webhook_delivery_success_rate:
+          type: number
+        webhook_retry_rate:
+          type: number
+        webhook_dlq_count:
+          type: integer
+        manual_review_pending:
+          type: integer
+        task_resolution_p95_seconds:
+          type: number
+          nullable: true
+
+    WebhookDeadLetter:
+      type: object
+      required:
+        [id, webhook_job_id, task_id, callback_url, payload, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        webhook_job_id:
+          type: string
+          format: uuid
+        task_id:
+          type: string
+          format: uuid
+        callback_url:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        error:
+          type: string
+          nullable: true
+        status_code:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        requeued_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    OpsIncident:
+      type: object
+      required: [id, incident_type, severity, status, title, source, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        incident_type:
+          type: string
+        severity:
+          type: string
+        status:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        owner:
+          type: string
+          nullable: true
+        source:
+          type: string
+        postmortem:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        resolved_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    CreateOpsIncidentRequest:
+      type: object
+      required: [incident_type, severity, title]
+      properties:
+        incident_type:
+          type: string
+        severity:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        owner:
+          type: string
+          nullable: true
+        source:
+          type: string
+          default: manual
+        metadata:
+          type: object
+          additionalProperties: true
+
+    UpdateOpsIncidentRequest:
+      type: object
+      properties:
+        status:
+          type: string
+        owner:
+          type: string
+          nullable: true
+        postmortem:
+          type: string
+          nullable: true
+        note:
+          type: string
+
+    OpsIncidentEvent:
+      type: object
+      required: [id, incident_id, actor, action, metadata, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        incident_id:
+          type: string
+          format: uuid
+        actor:
+          type: string
+        action:
+          type: string
+        note:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+
+    OpsIncidentScanRequest:
+      type: object
+      required: [overdue_threshold]
+      properties:
+        overdue_threshold:
+          type: integer
+          minimum: 1
+
+    LedgerEntry:
+      type: object
+      required: [id, entry_type, amount_usd, currency, meta, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        account_id:
+          type: string
+          format: uuid
+          nullable: true
+        task_id:
+          type: string
+          format: uuid
+          nullable: true
+        entry_type:
+          type: string
+        amount_usd:
+          type: number
+        currency:
+          type: string
+        external_ref:
+          type: string
+          nullable: true
+        meta:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+
+    OpsMarginSummary:
+      type: object
+      required:
+        [period, flows_used, refunds_count, avg_revenue_per_flow_usd, estimated_cost_per_flow_usd, estimated_revenue_usd, estimated_cost_usd, estimated_gross_profit_usd]
+      properties:
+        period:
+          type: string
+        flows_used:
+          type: integer
+        refunds_count:
+          type: integer
+        avg_revenue_per_flow_usd:
+          type: number
+        estimated_cost_per_flow_usd:
+          type: number
+        estimated_revenue_usd:
+          type: number
+        estimated_cost_usd:
+          type: number
+        estimated_gross_profit_usd:
+          type: number
+
+    OpsObservabilityResponse:
+      type: object
+      required: [service, generated_at, open_incidents, ops_metrics]
+      properties:
+        service:
+          type: string
+        generated_at:
+          type: string
+          format: date-time
+        request_id_echo:
+          type: string
+          nullable: true
+        open_incidents:
+          type: integer
+        ops_metrics:
+          $ref: "#/components/schemas/OpsMetricsResponse"
+
+    OpsTaskAuditEntry:
+      type: object
+      required: [id, task_id, actor, action, metadata, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        task_id:
+          type: string
+          format: uuid
+        actor:
+          type: string
+        action:
+          type: string
+        note:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+
+    OpsTimelineEvent:
+      type: object
+      required: [at, kind, actor, message, metadata]
+      properties:
+        at:
+          type: string
+          format: date-time
+        kind:
+          type: string
+        actor:
+          type: string
+        message:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    OpsTaskActionRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [manual_review, refund, reassign, force_status, add_note, recheck_review]
+        note:
+          type: string
+          nullable: true
+        reason_code:
+          type: string
+          nullable: true
+        manual_verdict:
+          type: string
+          enum: [approved, rejected]
+          nullable: true
+        worker_id:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          enum: [queued, claimed, completed, failed, disputed, refunded]
+          nullable: true
+
+    OpsTaskActionResponse:
+      type: object
+      required: [task]
+      properties:
+        task:
+          $ref: "#/components/schemas/TaskWithReview"
+        audit_entry:
+          $ref: "#/components/schemas/OpsTaskAuditEntry"
+
+    OpsBulkActionRequest:
+      allOf:
+        - $ref: "#/components/schemas/OpsTaskActionRequest"
+        - type: object
+          required: [task_ids]
+          properties:
+            task_ids:
+              type: array
+              minItems: 1
+              maxItems: 100
+              items:
+                type: string
+                format: uuid
+            dry_run:
+              type: boolean
+              default: false
+            confirm_text:
+              type: string
+              nullable: true
+
+    OpsBulkActionItem:
+      type: object
+      required: [task_id, ok]
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        ok:
+          type: boolean
+        error:
+          type: string
+          nullable: true
+        task:
+          $ref: "#/components/schemas/TaskWithReview"
+        audit_entry:
+          $ref: "#/components/schemas/OpsTaskAuditEntry"
+
+    OpsBulkActionResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpsBulkActionItem"
+
+    Task:
+      type: object
+      required:
+        [id, account_id, task_type, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        account_id:
+          type: string
+          format: uuid
+        worker_id:
+          type: string
+          format: uuid
+          nullable: true
+        task_type:
+          type: string
+          enum: [stuck_recovery, quick_judgment]
+        status:
+          type: string
+          enum:
+            [queued, claimed, completed, failed, disputed, refunded]
+        context:
+          type: object
+          additionalProperties: true
+        result:
+          type: object
+          additionalProperties: true
+          nullable: true
+        max_price_usd:
+          type: number
+        callback_url:
+          type: string
+          format: uri
+          nullable: true
+        sla_deadline:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Artifact:
+      type: object
+      required:
+        [id, task_id, artifact_type, storage_path, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        task_id:
+          type: string
+          format: uuid
+        artifact_type:
+          type: string
+          enum: [screenshot, logs, json_payload]
+        storage_path:
+          type: string
+        checksum_sha256:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+
+    Review:
+      type: object
+      required:
+        [id, task_id, auto_check_score, review_status, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        task_id:
+          type: string
+          format: uuid
+        auto_check_provider:
+          type: string
+          description: Auto-check provider (heuristic or openai)
+        auto_check_model:
+          type: string
+          description: Model name used for auto-check (when provider is openai)
+          nullable: true
+        auto_check_score:
+          type: number
+          minimum: 0
+          maximum: 1
+        auto_check_reason:
+          type: string
+          nullable: true
+        auto_check_redacted:
+          type: boolean
+          description: Whether PII redaction was applied before provider call (when provider is openai)
+          nullable: true
+        review_status:
+          type: string
+          enum: [auto_passed, manual_required, approved, rejected]
+        manual_verdict:
+          type: string
+          nullable: true
+        refund_flag:
+          type: boolean
+        claimed_by:
+          type: string
+          nullable: true
+        claimed_until:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    TaskWithReview:
+      allOf:
+        - $ref: "#/components/schemas/Task"
+        - type: object
+          properties:
+            artifacts:
+              type: array
+              items:
+                $ref: "#/components/schemas/Artifact"
+            review:
+              $ref: "#/components/schemas/Review"
+
+    TaskUpdatedEvent:
+      type: object
+      required: [event_id, event_type, created_at, task]
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+          enum: [task.updated]
+        created_at:
+          type: string
+          format: date-time
+        task:
+          $ref: "#/components/schemas/Task"

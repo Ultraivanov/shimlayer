@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#0b1d2e"/>
+    </linearGradient>
+    <linearGradient id="tab" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#059669"/>
+      <stop offset="100%" stop-color="#0ea5e9"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="1280" height="760" fill="url(#bg)"/>
+
+  <text x="80" y="86" font-family="Space Grotesk, sans-serif" font-size="20" fill="#34d399" letter-spacing="2">SHIMLAYER CONSOLE</text>
+  <text x="80" y="128" font-family="Space Grotesk, sans-serif" font-size="44" font-weight="700" fill="#e5e7eb">Human-in-the-loop Control Surface</text>
+  <text x="80" y="162" font-family="IBM Plex Mono, monospace" font-size="15" fill="#94a3b8">API http://localhost:8000 | Key demo-key | Admin dev-admin-key</text>
+
+  <rect x="80" y="196" rx="12" ry="12" width="140" height="44" fill="url(#tab)"/>
+  <text x="116" y="224" font-family="Space Grotesk, sans-serif" font-size="18" fill="#ffffff">Requester</text>
+  <rect x="232" y="196" rx="12" ry="12" width="130" height="44" fill="#1f2937" stroke="#475569"/>
+  <text x="271" y="224" font-family="Space Grotesk, sans-serif" font-size="18" fill="#e5e7eb">Operator</text>
+  <rect x="374" y="196" rx="12" ry="12" width="90" height="44" fill="#1f2937" stroke="#475569"/>
+  <text x="404" y="224" font-family="Space Grotesk, sans-serif" font-size="18" fill="#e5e7eb">Ops</text>
+
+  <rect x="80" y="266" rx="18" ry="18" width="540" height="192" fill="#111827" stroke="#334155"/>
+  <text x="108" y="304" font-family="Space Grotesk, sans-serif" font-size="28" fill="#e5e7eb">Credits</text>
+  <text x="108" y="336" font-family="Space Grotesk, sans-serif" font-size="16" fill="#9ca3af">Prepaid package model with per-flow charge.</text>
+  <text x="108" y="384" font-family="IBM Plex Mono, monospace" font-size="18" fill="#a7f3d0">Flow credits</text>
+  <text x="540" y="384" font-family="IBM Plex Mono, monospace" font-size="18" fill="#ffffff" text-anchor="end">149</text>
+  <line x1="108" y1="398" x2="592" y2="398" stroke="#334155"/>
+  <text x="108" y="430" font-family="IBM Plex Mono, monospace" font-size="18" fill="#a7f3d0">Balance USD</text>
+  <text x="540" y="430" font-family="IBM Plex Mono, monospace" font-size="18" fill="#ffffff" text-anchor="end">0.00</text>
+
+  <rect x="640" y="266" rx="18" ry="18" width="560" height="192" fill="#111827" stroke="#334155"/>
+  <text x="668" y="304" font-family="Space Grotesk, sans-serif" font-size="28" fill="#e5e7eb">Actions</text>
+  <rect x="668" y="326" rx="10" ry="10" width="220" height="42" fill="#059669"/>
+  <text x="695" y="353" font-family="Space Grotesk, sans-serif" font-size="17" fill="#ffffff">Create Stuck Recovery</text>
+  <rect x="902" y="326" rx="10" ry="10" width="220" height="42" fill="#1f2937" stroke="#475569"/>
+  <text x="935" y="353" font-family="Space Grotesk, sans-serif" font-size="17" fill="#e5e7eb">Create Quick Judgment</text>
+  <rect x="668" y="386" rx="10" ry="10" width="300" height="42" fill="#0b1220" stroke="#334155"/>
+  <text x="686" y="413" font-family="IBM Plex Mono, monospace" font-size="15" fill="#94a3b8">Task ID for refund</text>
+  <rect x="980" y="386" rx="10" ry="10" width="142" height="42" fill="#7f1d1d"/>
+  <text x="1030" y="413" font-family="Space Grotesk, sans-serif" font-size="17" fill="#ffffff">Refund</text>
+
+  <rect x="80" y="476" rx="18" ry="18" width="1120" height="228" fill="#111827" stroke="#334155"/>
+  <text x="108" y="514" font-family="Space Grotesk, sans-serif" font-size="28" fill="#e5e7eb">Packages</text>
+
+  <rect x="108" y="536" rx="14" ry="14" width="340" height="146" fill="#0f172a" stroke="#334155"/>
+  <text x="128" y="568" font-family="Space Grotesk, sans-serif" font-size="22" fill="#e5e7eb">indie_entry_150</text>
+  <text x="128" y="598" font-family="IBM Plex Mono, monospace" font-size="16" fill="#a7f3d0">150 flows</text>
+  <text x="128" y="626" font-family="IBM Plex Mono, monospace" font-size="16" fill="#e5e7eb">$255.00</text>
+  <rect x="128" y="640" rx="9" ry="9" width="130" height="32" fill="#1f2937" stroke="#475569"/>
+  <text x="163" y="661" font-family="Space Grotesk, sans-serif" font-size="15" fill="#e5e7eb">Buy Package</text>
+
+  <rect x="470" y="536" rx="14" ry="14" width="340" height="146" fill="#0f172a" stroke="#334155"/>
+  <text x="490" y="568" font-family="Space Grotesk, sans-serif" font-size="22" fill="#e5e7eb">growth_2000</text>
+  <text x="490" y="598" font-family="IBM Plex Mono, monospace" font-size="16" fill="#a7f3d0">2000 flows</text>
+  <text x="490" y="626" font-family="IBM Plex Mono, monospace" font-size="16" fill="#e5e7eb">$3360.00</text>
+  <rect x="490" y="640" rx="9" ry="9" width="130" height="32" fill="#1f2937" stroke="#475569"/>
+  <text x="525" y="661" font-family="Space Grotesk, sans-serif" font-size="15" fill="#e5e7eb">Buy Package</text>
+
+  <rect x="832" y="536" rx="14" ry="14" width="340" height="146" fill="#0f172a" stroke="#334155"/>
+  <text x="852" y="568" font-family="Space Grotesk, sans-serif" font-size="22" fill="#e5e7eb">scale_10000</text>
+  <text x="852" y="598" font-family="IBM Plex Mono, monospace" font-size="16" fill="#a7f3d0">10000 flows</text>
+  <text x="852" y="626" font-family="IBM Plex Mono, monospace" font-size="16" fill="#e5e7eb">$16500.00</text>
+  <rect x="852" y="640" rx="9" ry="9" width="130" height="32" fill="#1f2937" stroke="#475569"/>
+  <text x="887" y="661" font-family="Space Grotesk, sans-serif" font-size="15" fill="#e5e7eb">Buy Package</text>
+</svg>
