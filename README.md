@@ -62,6 +62,7 @@ pytest -q
 - Alpha local runbook: `docs/alpha-local-runbook.md`
 - Deploy runbook: `docs/deploy-runbook-v0.md`
 - Deploy handoff (for specialist): `docs/deploy-handoff.md`
+- Security notes: `docs/security-notes.md`
 
 Fast backend checks (no docker):
 ```bash
