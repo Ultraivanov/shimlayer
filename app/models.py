@@ -156,6 +156,11 @@ class TaskUpdatedEvent(BaseModel):
     task: Task
 
 
+class TaskSyncResponse(BaseModel):
+    items: list[TaskWithReview]
+    next_cursor: str | None = None
+
+
 class WebhookJob(BaseModel):
     id: UUID
     task_id: UUID
@@ -195,6 +200,17 @@ class WebhookDeadLetter(BaseModel):
     status_code: int | None = None
     created_at: datetime
     requeued_at: datetime | None = None
+
+
+class WebhookDelivery(BaseModel):
+    id: UUID
+    task_id: UUID
+    callback_url: str
+    status_code: int | None = None
+    attempt_no: int
+    success: bool
+    error: str | None = None
+    created_at: datetime
 
 
 class OpsTaskActionRequest(BaseModel):

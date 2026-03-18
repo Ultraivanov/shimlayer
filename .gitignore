@@ -7,3 +7,4 @@ frontend/dist/
 frontend/.playwright-browsers/
 frontend/playwright-report/
 frontend/test-results/
+data/artifacts/

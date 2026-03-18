@@ -56,6 +56,9 @@ async function seedManualRequiredTask(request: APIRequestContext, suffix: string
 }
 
 async function openOps(page: Page) {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("ops.manualQueueAutoRefreshSeconds", "0");
+  });
   await page.goto("/");
   await page.locator('[data-qa="tab-ops"]').click();
   await expect(page.locator('[data-testid="ops-flow-queue"]')).toBeVisible();
@@ -121,6 +124,7 @@ test.describe("Ops manual review", () => {
     await firstRow.press("Enter");
     const activeRow = page.locator('[data-testid="ops-flow-row"][aria-selected="true"]').first();
     await expect(activeRow).toBeVisible({ timeout: 20_000 });
+    await expect(activeRow.locator('[data-testid="ops-claim-badge"][data-claim-state="mine"]')).toBeVisible({ timeout: 20_000 });
     const beforeId = await activeRow.getAttribute("data-task-id");
     expect(beforeId).toBeTruthy();
 

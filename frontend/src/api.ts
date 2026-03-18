@@ -2,6 +2,7 @@ import type {
   BalanceResponse,
   DeadLetter,
   LedgerEntry,
+  WebhookDelivery,
   OpsActionResponse,
   OpsBulkActionResponse,
   OpsTimelineEvent,
@@ -13,7 +14,10 @@ import type {
   Task,
   TaskAuditEntry,
   OpsIncident,
-  TaskWithReview
+  TaskWithReview,
+  TaskSyncResponse,
+  OpenAIInterruptionRecord,
+  OpenAIResumeResponse
 } from "./types";
 
 type Config = {
@@ -111,6 +115,16 @@ export const Api = {
     const suffix = q.toString() ? `?${q.toString()}` : "";
     return http<TaskWithReview[]>(`/v1/tasks${suffix}`);
   },
+  syncMyTasks: (params: { limit?: number; cursor?: string; updatedAfter?: string; status?: string; taskType?: string } = {}) => {
+    const q = new URLSearchParams();
+    q.set("limit", String(params.limit ?? 50));
+    if (params.cursor) q.set("cursor", params.cursor);
+    if (params.updatedAfter) q.set("updated_after", params.updatedAfter);
+    if (params.status) q.set("status_filter", params.status);
+    if (params.taskType) q.set("task_type", params.taskType);
+    const suffix = q.toString() ? `?${q.toString()}` : "";
+    return http<TaskSyncResponse>(`/v1/tasks/sync${suffix}`);
+  },
   claimTask: (taskId: string) => http<Task>(`/v1/tasks/${taskId}/claim`, { method: "POST" }),
   completeTask: (taskId: string, result: Record<string, unknown>, workerNote?: string | null) =>
     http<Task>(`/v1/tasks/${taskId}/complete`, {
@@ -169,6 +183,24 @@ export const Api = {
     const contentType = res.headers.get("Content-Type") ?? "application/zip";
     return { blob, filename, contentType };
   },
+  downloadOpsFlowBundlesZip: async (taskIds: string[]) => {
+    const headers = new Headers();
+    headers.set("Content-Type", "application/json");
+    headers.set("X-API-Key", config.apiKey);
+    headers.set("X-Admin-Key", config.adminKey);
+    headers.set("X-Admin-Role", config.adminRole);
+    headers.set("X-Admin-User", getAdminUser());
+    const res = await fetch(`${config.baseUrl}/v1/ops/flows/download-bulk`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ task_ids: taskIds })
+    });
+    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+    const blob = await res.blob();
+    const filename = parseDispositionFilename(res.headers.get("Content-Disposition")) ?? "flows-selected.zip";
+    const contentType = res.headers.get("Content-Type") ?? "application/zip";
+    return { blob, filename, contentType };
+  },
   downloadTaskBundle: async (taskId: string) => {
     const headers = new Headers();
     headers.set("X-API-Key", config.apiKey);
@@ -179,7 +211,25 @@ export const Api = {
     const contentType = res.headers.get("Content-Type") ?? "application/zip";
     return { blob, filename, contentType };
   },
+  listTaskWebhookDeliveries: (taskId: string, limit = 20) => {
+    const q = new URLSearchParams();
+    q.set("limit", String(limit));
+    return http<WebhookDelivery[]>(`/v1/tasks/${encodeURIComponent(taskId)}/webhooks/deliveries?${q.toString()}`);
+  },
+  getTaskWebhookLastDelivery: (taskId: string) =>
+    http<WebhookDelivery | null>(`/v1/tasks/${encodeURIComponent(taskId)}/webhooks/last`),
   refundTask: (taskId: string) => http<Task>(`/v1/tasks/${taskId}/refund`, { method: "POST" }),
+  ingestOpenAIInterruption: (payload: Record<string, unknown>) =>
+    http<OpenAIInterruptionRecord>("/v1/openai/interruptions/ingest", { method: "POST", body: JSON.stringify(payload) }),
+  getOpenAIInterruption: (interruptionId: string) =>
+    http<OpenAIInterruptionRecord>(`/v1/openai/interruptions/${encodeURIComponent(interruptionId)}`),
+  decideOpenAIInterruption: (interruptionId: string, payload: Record<string, unknown>) =>
+    http<OpenAIInterruptionRecord>(
+      `/v1/openai/interruptions/${encodeURIComponent(interruptionId)}/decision`,
+      { method: "POST", body: JSON.stringify(payload) }
+    ),
+  resumeOpenAIInterruption: (interruptionId: string) =>
+    http<OpenAIResumeResponse>(`/v1/openai/interruptions/${encodeURIComponent(interruptionId)}/resume`, { method: "POST" }),
   getOpsMetrics: () => http<OpsMetrics>("/v1/ops/metrics", {}, true),
   getDlq: (limit = 20) => http<DeadLetter[]>(`/v1/ops/dlq?limit=${limit}`, {}, true),
   getOpsManualReviewQueue: (params: { limit?: number; status?: string; taskType?: string; includeLocked?: boolean } = {}) => {
@@ -247,5 +297,14 @@ export const Api = {
       true
     ),
   requeueDlq: (deadLetterId: string) =>
-    http<{ requeued: boolean }>(`/v1/webhooks/dlq/${deadLetterId}/requeue`, { method: "POST" }, true)
+    http<{ requeued: boolean }>(`/v1/webhooks/dlq/${deadLetterId}/requeue`, { method: "POST" }, true),
+  listWebhookDeliveries: (taskId: string, limit = 20) =>
+    http<WebhookDelivery[]>(
+      `/v1/ops/webhooks/deliveries?task_id=${encodeURIComponent(taskId)}&limit=${encodeURIComponent(String(limit))}`,
+      {},
+      true
+    ),
+  getOpsWebhookLastDelivery: (taskId: string) =>
+    http<WebhookDelivery | null>(`/v1/ops/webhooks/last?task_id=${encodeURIComponent(taskId)}`, {}, true),
+  resendWebhook: (taskId: string) => http<{ enqueued: boolean; reason?: string }>(`/v1/ops/webhooks/tasks/${taskId}/resend`, { method: "POST" }, true)
 };

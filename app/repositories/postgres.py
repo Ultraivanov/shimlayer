@@ -34,6 +34,7 @@ from app.models import (
     UpdateOpsIncidentRequest,
     WebhookJob,
     WebhookDeadLetter,
+    WebhookDelivery,
     new_task,
     utcnow,
 )
@@ -382,6 +383,84 @@ class PostgresRepository:
                     from public.tasks t
                     {where_sql}
                     order by t.updated_at desc
+                    limit %s
+                    """,
+                    (*params, capped_limit),
+                )
+                task_rows = cur.fetchall() or []
+                tasks = [self._task_from_row(row) for row in task_rows]
+                if not tasks:
+                    conn.commit()
+                    return []
+
+                task_ids = [t.id for t in tasks]
+                cur.execute(
+                    """
+                    select *
+                    from public.artifacts
+                    where task_id = any(%s)
+                    order by created_at desc
+                    """,
+                    (task_ids,),
+                )
+                artifact_rows = cur.fetchall() or []
+                cur.execute("select * from public.reviews where task_id = any(%s)", (task_ids,))
+                review_rows = cur.fetchall() or []
+            conn.commit()
+
+        artifacts_by_task: dict[UUID, list[Artifact]] = {}
+        for row in artifact_rows:
+            tid = row["task_id"]
+            artifacts_by_task.setdefault(tid, []).append(self._artifact_from_row(row))
+
+        review_by_task: dict[UUID, Review] = {}
+        for row in review_rows:
+            review = self._review_from_row(row)
+            review_by_task[review.task_id] = review
+
+        out: list[TaskWithReview] = []
+        for t in tasks:
+            out.append(
+                TaskWithReview(
+                    **t.model_dump(),
+                    artifacts=artifacts_by_task.get(t.id, []),
+                    review=review_by_task.get(t.id),
+                )
+            )
+        return out
+
+    def list_account_tasks_with_review_after(
+        self,
+        api_key: str,
+        after_updated_at: datetime | None,
+        after_task_id: UUID | None,
+        limit: int = 50,
+        status: str | None = None,
+        task_type: str | None = None,
+    ) -> list[TaskWithReview]:
+        capped_limit = max(1, min(limit, 500))
+        with self._conn() as conn:
+            account_id, _, _ = self._get_or_create_account(conn, api_key)
+            filters: list[str] = ["t.account_id = %s"]
+            params: list[object] = [account_id]
+            if status:
+                filters.append("t.status = %s")
+                params.append(status)
+            if task_type:
+                filters.append("t.task_type = %s")
+                params.append(task_type)
+            if after_updated_at is not None:
+                filters.append("(t.updated_at, t.id) > (%s, %s)")
+                params.append(after_updated_at)
+                params.append(after_task_id or UUID(int=0))
+            where_sql = f"where {' and '.join(filters)}"
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    select t.*
+                    from public.tasks t
+                    {where_sql}
+                    order by t.updated_at asc, t.id asc
                     limit %s
                     """,
                     (*params, capped_limit),
@@ -1644,6 +1723,24 @@ class PostgresRepository:
                     (uuid4(), task_id, callback_url, status_code, attempt, success, error, utcnow()),
                 )
             conn.commit()
+
+    def list_webhook_deliveries(self, task_id: UUID, limit: int = 50) -> list[WebhookDelivery]:
+        limit = max(1, min(int(limit or 50), 300))
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    select id, task_id, callback_url, status_code, attempt_no, success, error, created_at
+                    from public.webhook_deliveries
+                    where task_id = %s
+                    order by created_at desc
+                    limit %s
+                    """,
+                    (task_id, limit),
+                )
+                rows = cur.fetchall() or []
+            conn.commit()
+        return [WebhookDelivery(**row) for row in rows]
 
     def get_openai_interruption(self, interruption_id: str) -> OpenAIInterruptionRecord | None:
         with self._conn() as conn:

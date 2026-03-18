@@ -31,6 +31,7 @@ from app.models import (
     TopUpRequest,
     WebhookJob,
     WebhookDeadLetter,
+    WebhookDelivery,
     new_task,
     utcnow,
 )
@@ -273,6 +274,40 @@ class InMemoryRepository:
             if task_type:
                 rows = [t for t in rows if self._enum_or_str(t.task_type) == task_type]
             rows.sort(key=lambda t: t.updated_at, reverse=True)
+            capped = rows[: max(1, min(limit, 500))]
+            out: list[TaskWithReview] = []
+            for t in capped:
+                out.append(
+                    TaskWithReview(
+                        **t.model_dump(),
+                        artifacts=self._artifacts.get(t.id, []),
+                        review=self._reviews.get(t.id),
+                    )
+                )
+            return out
+
+    def list_account_tasks_with_review_after(
+        self,
+        api_key: str,
+        after_updated_at: datetime | None,
+        after_task_id: UUID | None,
+        limit: int = 50,
+        status: str | None = None,
+        task_type: str | None = None,
+    ) -> list[TaskWithReview]:
+        with self._lock:
+            account_id, _, _ = self.get_or_create_account(api_key)
+            rows = [t for t in self._tasks.values() if t.account_id == account_id]
+            if status:
+                rows = [t for t in rows if self._enum_or_str(t.status) == status]
+            if task_type:
+                rows = [t for t in rows if self._enum_or_str(t.task_type) == task_type]
+
+            if after_updated_at is not None:
+                cut_id = after_task_id or UUID(int=0)
+                rows = [t for t in rows if (t.updated_at, t.id) > (after_updated_at, cut_id)]
+
+            rows.sort(key=lambda t: (t.updated_at, t.id))
             capped = rows[: max(1, min(limit, 500))]
             out: list[TaskWithReview] = []
             for t in capped:
@@ -815,7 +850,7 @@ class InMemoryRepository:
 
             delivery_total = len(self._webhook_deliveries)
             success_total = sum(1 for d in self._webhook_deliveries if d.get("success"))
-            retry_total = sum(1 for d in self._webhook_deliveries if int(d.get("attempt", 1)) > 1)
+            retry_total = sum(1 for d in self._webhook_deliveries if int(d.get("attempt_no", 1)) > 1)
 
             durations = []
             status_counts: dict[str, int] = {}
@@ -952,15 +987,43 @@ class InMemoryRepository:
         with self._lock:
             self._webhook_deliveries.append(
                 {
+                    "id": str(uuid4()),
                     "task_id": str(task_id),
                     "callback_url": callback_url,
                     "status_code": status_code,
-                    "attempt": attempt,
+                    "attempt_no": attempt,
                     "success": success,
                     "error": error,
                     "created_at": utcnow().isoformat(),
                 }
             )
+
+    def list_webhook_deliveries(self, task_id: UUID, limit: int = 50) -> list[WebhookDelivery]:
+        with self._lock:
+            rows = [d for d in self._webhook_deliveries if d.get("task_id") == str(task_id)]
+        rows.sort(key=lambda r: str(r.get("created_at", "")), reverse=True)
+        limit = max(1, min(int(limit or 50), 300))
+        deliveries: list[WebhookDelivery] = []
+        for row in rows[:limit]:
+            created_at_raw = row.get("created_at")
+            created_at = (
+                datetime.fromisoformat(created_at_raw)
+                if isinstance(created_at_raw, str) and created_at_raw
+                else utcnow()
+            )
+            deliveries.append(
+                WebhookDelivery(
+                    id=UUID(str(row.get("id") or uuid4())),
+                    task_id=UUID(str(row.get("task_id"))),
+                    callback_url=str(row.get("callback_url") or ""),
+                    status_code=int(row["status_code"]) if row.get("status_code") is not None else None,
+                    attempt_no=int(row.get("attempt_no") or 1),
+                    success=bool(row.get("success")),
+                    error=str(row.get("error")) if row.get("error") is not None else None,
+                    created_at=created_at,
+                )
+            )
+        return deliveries
 
     def get_openai_interruption(self, interruption_id: str) -> OpenAIInterruptionRecord | None:
         with self._lock:

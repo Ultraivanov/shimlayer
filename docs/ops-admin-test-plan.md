@@ -9,6 +9,7 @@
 python3 -m pytest -q \
   tests/test_ops_admin_controls.py \
   tests/test_smoke_flow.py \
+  tests/test_openai_resume_worker_e2e.py \
   tests/test_webhook_worker.py \
   tests/test_stripe_webhook.py \
   tests/test_stripe_signature.py

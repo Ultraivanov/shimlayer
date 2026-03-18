@@ -11,7 +11,8 @@ import type {
   OpsObservability,
   Task,
   TaskAuditEntry,
-  TaskWithReview
+  TaskWithReview,
+  WebhookDelivery
 } from "../types";
 import { ArtifactTile } from "../components/ArtifactTile";
 
@@ -37,6 +38,9 @@ type OpsView = "all" | "flows" | "incidents" | "finance" | "observability";
 type FlowInspectorTab = "summary" | "context" | "result" | "artifacts" | "timeline";
 type TrendWindow = 12 | 24 | 48;
 type AutoRefreshSeconds = 0 | 15 | 30 | 60;
+type ManualQueueRefreshSeconds = 0 | 5 | 15 | 30;
+type FlowQueueViewMode = "list" | "tiles";
+type ManualReviewFocus = "queue" | "mine" | "locked";
 type ToastLevel = "success" | "error";
 type SavedView = {
   id: string;
@@ -47,11 +51,10 @@ type SavedView = {
   showOnlyProblem: boolean;
   showSlaBreachQueue: boolean;
   showManualReviewQueue: boolean;
-  showLockedManualReview: boolean;
-  manualReviewMineOnly: boolean;
-  manualReviewLockedOnly: boolean;
+  manualReviewFocus: ManualReviewFocus;
   sortMode: SortMode;
   pageSize: number;
+  flowQueueView: FlowQueueViewMode;
 };
 type MetricsHistoryPoint = {
   at: string;
@@ -105,6 +108,28 @@ function loadFlag(key: string, fallback: boolean): boolean {
   return value === "true";
 }
 
+function downloadBlobAsFile(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function shortError(value: string, maxLen = 160): string {
+  const v = String(value || "");
+  if (v.length <= maxLen) return v;
+  return `${v.slice(0, maxLen)}…`;
+}
+
+function csvCell(value: unknown): string {
+  const s = String(value ?? "");
+  return `"${s.replace(/\"/g, "\"\"")}"`;
+}
+
 function loadMetricsHistory(): MetricsHistoryPoint[] {
   try {
     const raw = localStorage.getItem(METRICS_HISTORY_KEY);
@@ -121,8 +146,20 @@ function loadSavedViews(): SavedView[] {
   try {
     const raw = localStorage.getItem(SAVED_VIEWS_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as Array<Partial<SavedView>>;
+    const parsed = JSON.parse(raw) as Array<Record<string, unknown>>;
     if (!Array.isArray(parsed)) return [];
+    const coerceFocus = (v: Record<string, unknown>): ManualReviewFocus => {
+      const direct = typeof v.manualReviewFocus === "string" ? v.manualReviewFocus : "";
+      if (direct === "queue" || direct === "mine" || direct === "locked") return direct;
+      // Legacy booleans → best-effort mapping to 3-state focus.
+      // - "Mine only" / "Locked only" map directly.
+      // - "Show locked" maps to the locked-only view (closest equivalent).
+      // - "Unclaimed only" maps to the queue view (unclaimed → mine).
+      if (Boolean(v.manualReviewLockedOnly)) return "locked";
+      if (Boolean(v.manualReviewMineOnly)) return "mine";
+      if (Boolean(v.showLockedManualReview)) return "locked";
+      return "queue";
+    };
     return parsed.map((v) => ({
       id: String(v.id ?? ""),
       name: String(v.name ?? "Saved view"),
@@ -132,11 +169,10 @@ function loadSavedViews(): SavedView[] {
       showOnlyProblem: Boolean(v.showOnlyProblem),
       showSlaBreachQueue: Boolean(v.showSlaBreachQueue),
       showManualReviewQueue: Boolean(v.showManualReviewQueue),
-      showLockedManualReview: Boolean(v.showLockedManualReview),
-      manualReviewMineOnly: Boolean(v.manualReviewMineOnly),
-      manualReviewLockedOnly: Boolean(v.manualReviewLockedOnly),
+      manualReviewFocus: coerceFocus(v),
       sortMode: (v.sortMode as SortMode) || "updated_desc",
-      pageSize: Number(v.pageSize ?? 25)
+      pageSize: Number(v.pageSize ?? 25),
+      flowQueueView: (v.flowQueueView as FlowQueueViewMode) || "list"
     })).filter((v) => v.id);
   } catch {
     return [];
@@ -163,6 +199,12 @@ export function OpsPage() {
   const [flows, setFlows] = useState<Task[]>([]);
   const [selectedFlowId, setSelectedFlowId] = useState<string>("");
   const [selectedFlow, setSelectedFlow] = useState<TaskWithReview | null>(null);
+  const [webhookLast, setWebhookLast] = useState<WebhookDelivery | null>(null);
+  const [webhookDeliveries, setWebhookDeliveries] = useState<WebhookDelivery[]>([]);
+  const [webhookDeliveriesLoading, setWebhookDeliveriesLoading] = useState(false);
+  const [webhookDeliveriesError, setWebhookDeliveriesError] = useState("");
+  const [webhookAttemptsOpen, setWebhookAttemptsOpen] = useState(false);
+  const [webhookResendRunning, setWebhookResendRunning] = useState(false);
   const [audit, setAudit] = useState<TaskAuditEntry[]>([]);
   const [timeline, setTimeline] = useState<Array<{ at: string; kind: string; actor: string; message: string }>>([]);
   const [incidents, setIncidents] = useState<OpsIncident[]>([]);
@@ -170,15 +212,25 @@ export function OpsPage() {
   const [showOnlyProblem, setShowOnlyProblem] = useState<boolean>(() => loadFlag("ops.showOnlyProblem", false));
   const [showSlaBreachQueue, setShowSlaBreachQueue] = useState<boolean>(() => loadFlag("ops.showSlaBreachQueue", false));
   const [showManualReviewQueue, setShowManualReviewQueue] = useState<boolean>(() => loadFlag("ops.showManualReviewQueue", false));
-  const [showLockedManualReview, setShowLockedManualReview] = useState<boolean>(() => loadFlag("ops.showLockedManualReview", false));
-  const [manualReviewMineOnly, setManualReviewMineOnly] = useState<boolean>(() => loadFlag("ops.manualReviewMineOnly", false));
-  const [manualReviewLockedOnly, setManualReviewLockedOnly] = useState<boolean>(() => loadFlag("ops.manualReviewLockedOnly", false));
+  const [manualReviewFocus, setManualReviewFocus] = useState<ManualReviewFocus>(() => {
+    const direct = localStorage.getItem("ops.manualReviewFocus");
+    if (direct === "queue" || direct === "mine" || direct === "locked") return direct;
+    // Legacy localStorage keys migration.
+    if (loadFlag("ops.manualReviewLockedOnly", false)) return "locked";
+    if (loadFlag("ops.manualReviewMineOnly", false)) return "mine";
+    if (loadFlag("ops.showLockedManualReview", false)) return "locked";
+    return "queue";
+  });
   const [manualReviewAutoRenew, setManualReviewAutoRenew] = useState<boolean>(() => loadFlag("ops.manualReviewAutoRenew", true));
   const [statusFilter, setStatusFilter] = useState<string>(() => localStorage.getItem("ops.statusFilter") ?? "");
   const [taskTypeFilter, setTaskTypeFilter] = useState<string>(() => localStorage.getItem("ops.taskTypeFilter") ?? "");
   const [searchQuery, setSearchQuery] = useState<string>(() => localStorage.getItem("ops.searchQuery") ?? "");
+  const [openTaskId, setOpenTaskId] = useState<string>("");
+  const [openTaskBusy, setOpenTaskBusy] = useState<boolean>(false);
+  const [pinnedFlowId, setPinnedFlowId] = useState<string>("");
   const [sortMode, setSortMode] = useState<SortMode>(() => (localStorage.getItem("ops.sortMode") as SortMode) || "updated_desc");
   const [activeView, setActiveView] = useState<OpsView>(() => (localStorage.getItem("ops.activeView") as OpsView) || "all");
+  const [flowQueueView, setFlowQueueView] = useState<FlowQueueViewMode>(() => (localStorage.getItem("ops.flowQueueView") as FlowQueueViewMode) || "list");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
@@ -194,6 +246,8 @@ export function OpsPage() {
   const [expandedIncidentIds, setExpandedIncidentIds] = useState<Record<string, boolean>>({});
 
   const [lastBulkResults, setLastBulkResults] = useState<BulkResult[]>([]);
+  const [isDownloadRunning, setIsDownloadRunning] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<{ done: number; total: number; mode: "multi" | "zip" } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [savedViews, setSavedViews] = useState<SavedView[]>(() => loadSavedViews());
@@ -209,6 +263,14 @@ export function OpsPage() {
   const [autoRefreshPausedUntilMs, setAutoRefreshPausedUntilMs] = useState<number>(0);
   const [autoRefreshFailureCount, setAutoRefreshFailureCount] = useState<number>(0);
   const [autoRefreshLastError, setAutoRefreshLastError] = useState<string>("");
+  const [manualQueueAutoRefreshSeconds, setManualQueueAutoRefreshSeconds] = useState<ManualQueueRefreshSeconds>(() => {
+    const raw = Number(localStorage.getItem("ops.manualQueueAutoRefreshSeconds") ?? "5");
+    if (raw === 0 || raw === 5 || raw === 15 || raw === 30) return raw;
+    return 5;
+  });
+  const [manualQueuePausedUntilMs, setManualQueuePausedUntilMs] = useState<number>(0);
+  const [manualQueueFailureCount, setManualQueueFailureCount] = useState<number>(0);
+  const [manualQueueLastError, setManualQueueLastError] = useState<string>("");
   const [isPageVisible, setIsPageVisible] = useState<boolean>(() => document.visibilityState === "visible");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isActionRunning, setIsActionRunning] = useState(false);
@@ -236,6 +298,8 @@ export function OpsPage() {
   const claimedManualReviewIdRef = useRef<string>("");
   const lockRenewInFlightRef = useRef(false);
   const lockRenewLastAtRef = useRef(0);
+  const manualQueuePausedUntilMsRef = useRef(0);
+  const manualQueueRefreshInFlightRef = useRef(false);
 
   const selectedStatusOption = useMemo<string[]>(() => (statusFilter ? [statusFilter] : []), [statusFilter]);
   const selectedForceStatus = useMemo<string[]>(() => [forceStatus], [forceStatus]);
@@ -246,6 +310,8 @@ export function OpsPage() {
   const canViewFinance = role === "finance" || role === "ops_manager" || role === "admin";
   const canSeeClaimOwner = role === "ops_manager" || role === "admin";
   const canTakeOverClaim = role === "ops_manager" || role === "admin";
+  const canViewWebhookDeliveries = role === "ops_agent" || role === "ops_manager" || role === "admin";
+  const canResendWebhook = role === "ops_agent" || role === "ops_manager" || role === "admin";
   const canDownloadArtifact = rolePermissions.has("download_artifact");
   const canDownloadBundle = rolePermissions.has("download_bundle");
 
@@ -255,6 +321,11 @@ export function OpsPage() {
 
   function actionDisabledTitle(action: string): string | undefined {
     return canAction(action) ? undefined : `Role "${role}" cannot run "${action}"`;
+  }
+
+  function isUuidLike(value: string): boolean {
+    const v = String(value || "").trim();
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
   }
 
   useEffect(() => {
@@ -273,14 +344,8 @@ export function OpsPage() {
     localStorage.setItem("ops.manualReviewAutoRenew", String(manualReviewAutoRenew));
   }, [manualReviewAutoRenew]);
   useEffect(() => {
-    localStorage.setItem("ops.showLockedManualReview", String(showLockedManualReview));
-  }, [showLockedManualReview]);
-  useEffect(() => {
-    localStorage.setItem("ops.manualReviewMineOnly", String(manualReviewMineOnly));
-  }, [manualReviewMineOnly]);
-  useEffect(() => {
-    localStorage.setItem("ops.manualReviewLockedOnly", String(manualReviewLockedOnly));
-  }, [manualReviewLockedOnly]);
+    localStorage.setItem("ops.manualReviewFocus", manualReviewFocus);
+  }, [manualReviewFocus]);
   useEffect(() => {
     if (showManualReviewQueue) {
       claimedManualReviewIdRef.current = "";
@@ -303,6 +368,32 @@ export function OpsPage() {
   useEffect(() => {
     localStorage.setItem("ops.activeView", activeView);
   }, [activeView]);
+  useEffect(() => {
+    localStorage.setItem("ops.flowQueueView", flowQueueView);
+  }, [flowQueueView]);
+
+  const manualReviewCounts = useMemo(() => {
+    if (!showManualReviewQueue) return { queue: 0, mine: 0, locked: 0, total: 0 };
+    let base = flows;
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      base = base.filter((t) => {
+        const haystack = `${t.id} ${t.account_id} ${t.task_type} ${t.status}`.toLowerCase();
+        return haystack.includes(q);
+      });
+    }
+    let queue = 0;
+    let mine = 0;
+    let locked = 0;
+    for (const t of base) {
+      const review = (t as any)?.review as { claimed_by?: string | null; claimed_until?: string | null } | undefined;
+      const state = claimStateFromReview(review, nowMs, me);
+      if (state.isLocked) locked += 1;
+      else queue += 1; // unclaimed/expired + mine
+      if (state.isMine) mine += 1;
+    }
+    return { queue, mine, locked, total: base.length };
+  }, [flows, me, nowMs, searchQuery, showManualReviewQueue]);
 
   const filteredFlows = useMemo(() => {
     let base = flows;
@@ -310,9 +401,9 @@ export function OpsPage() {
       base = base.filter((t) => {
         const review = (t as any)?.review as { claimed_by?: string | null; claimed_until?: string | null } | undefined;
         const state = claimStateFromReview(review, nowMs, me);
-        if (!showLockedManualReview && state.isLocked) return false;
-        if (manualReviewMineOnly && !state.isMine) return false;
-        if (manualReviewLockedOnly && !state.isLocked) return false;
+        if (manualReviewFocus === "queue" && state.isLocked) return false;
+        if (manualReviewFocus === "mine" && !state.isMine) return false;
+        if (manualReviewFocus === "locked" && !state.isLocked) return false;
         return true;
       });
     }
@@ -324,11 +415,9 @@ export function OpsPage() {
     });
   }, [
     flows,
-    manualReviewLockedOnly,
-    manualReviewMineOnly,
+    manualReviewFocus,
     nowMs,
     searchQuery,
-    showLockedManualReview,
     showManualReviewQueue,
     me
   ]);
@@ -553,6 +642,12 @@ export function OpsPage() {
     setAutoRefreshLastError("");
   }
 
+  function resetManualQueueAutoRefreshPause() {
+    setManualQueuePausedUntilMs(0);
+    setManualQueueFailureCount(0);
+    setManualQueueLastError("");
+  }
+
   useEffect(() => {
     setIncidentOwnerDrafts((prev) => {
       const next = { ...prev };
@@ -583,6 +678,10 @@ export function OpsPage() {
   }, [autoRefreshSeconds]);
 
   useEffect(() => {
+    localStorage.setItem("ops.manualQueueAutoRefreshSeconds", String(manualQueueAutoRefreshSeconds));
+  }, [manualQueueAutoRefreshSeconds]);
+
+  useEffect(() => {
     localStorage.setItem(SAVED_VIEWS_KEY, JSON.stringify(savedViews));
   }, [savedViews]);
 
@@ -595,6 +694,10 @@ export function OpsPage() {
     const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    manualQueuePausedUntilMsRef.current = manualQueuePausedUntilMs;
+  }, [manualQueuePausedUntilMs]);
 
   useEffect(() => {
     if (!metrics) return;
@@ -617,17 +720,14 @@ export function OpsPage() {
       setSelectedFlowId(taskId);
       return;
     }
-    if (showLockedManualReview) {
-      const rowReview = (flows.find((t) => t.id === taskId) as any)?.review as
-        | { claimed_by?: string | null; claimed_until?: string | null }
-        | undefined;
-      const claimedBy = rowReview?.claimed_by ? String(rowReview.claimed_by) : "";
-      const claimedUntilMs = rowReview?.claimed_until ? new Date(String(rowReview.claimed_until)).getTime() : 0;
-      const active = Boolean(claimedBy) && claimedUntilMs > Date.now();
-      if (active && claimedBy !== me) {
-        setSelectedFlowId(taskId);
-        return;
-      }
+    const rowReview = (flows.find((t) => t.id === taskId) as any)?.review as
+      | { claimed_by?: string | null; claimed_until?: string | null }
+      | undefined;
+    const state = claimStateFromReview(rowReview, Date.now(), me);
+    // Never attempt to claim another reviewer's lock.
+    if (state.isLocked) {
+      setSelectedFlowId(taskId);
+      return;
     }
     setIsClaimRunning(true);
     try {
@@ -728,7 +828,8 @@ export function OpsPage() {
     }
   }
 
-  async function loadFlows() {
+  async function loadFlows(options: { source?: "manual" | "auto" } = {}) {
+    const source = options.source ?? "manual";
     const pendingSelectId = pendingManualReviewSelectRef.current;
     const list = showManualReviewQueue
       ? await Api.getOpsManualReviewQueue({
@@ -746,6 +847,22 @@ export function OpsPage() {
           taskType: taskTypeFilter || undefined
         });
     setFlows(list);
+
+    // Keep claim status (review/lock) fresh for the selected flow during manual review.
+    if (showManualReviewQueue && selectedFlowId) {
+      const row = list.find((t) => t.id === selectedFlowId) as any;
+      if (row) {
+        setSelectedFlow((prev) => {
+          if (!prev || prev.id !== selectedFlowId) return prev;
+          const next: any = { ...prev };
+          if ("review" in row && row.review) next.review = row.review;
+          if ("status" in row && row.status) next.status = row.status;
+          if ("artifacts" in row && row.artifacts) next.artifacts = row.artifacts;
+          return next;
+        });
+      }
+    }
+
     if (pendingSelectId !== null) {
       pendingManualReviewSelectRef.current = null;
       const nextId = list.some((t) => t.id === pendingSelectId) ? pendingSelectId : (list[0]?.id ?? "");
@@ -753,15 +870,16 @@ export function OpsPage() {
       return;
     }
     if (!selectedFlowId && list.length > 0) {
-      if (showManualReviewQueue) {
-        void claimAndSelectFlow(list[0].id);
-      } else {
-        setSelectedFlowId(list[0].id);
-      }
+      // Never auto-claim tasks from refresh (auto-refresh or manual refresh).
+      // Claim happens only on explicit user action (Take next / clicking a row).
+      setSelectedFlowId(list[0].id);
     }
     if (selectedFlowId && !list.some((t) => t.id === selectedFlowId)) {
       setSelectedFlowId(list[0]?.id ?? "");
     }
+
+    // For auto-refresh we avoid surprising selection changes beyond keeping selection valid.
+    if (source === "auto") return;
   }
 
   async function loadFlowDetail(taskId: string) {
@@ -773,6 +891,94 @@ export function OpsPage() {
     setSelectedFlow(task);
     setAudit(log);
     setTimeline(line);
+  }
+
+  async function openFlowById() {
+    const id = openTaskId.trim();
+    if (!id) return;
+    if (!isUuidLike(id)) {
+      pushToast("error", "Invalid Task ID (expected UUID)");
+      return;
+    }
+    if (openTaskBusy) return;
+    setOpenTaskBusy(true);
+    try {
+      const task = await Api.getOpsFlow(id);
+      setPinnedFlowId(id);
+      setSelectedFlowId(id);
+      setSelectedFlow(task);
+      setFlows((prev) => {
+        const next = [task as unknown as TaskWithReview, ...prev.filter((t) => t.id !== id)];
+        return next;
+      });
+      const [log, line] = await Promise.all([Api.getOpsFlowAudit(id), Api.getOpsFlowTimeline(id)]);
+      setAudit(log);
+      setTimeline(line);
+      setInspectorTab("summary");
+      if (task.callback_url) {
+        void loadWebhookLast(id);
+      } else {
+        setWebhookLast(null);
+        setWebhookDeliveries([]);
+        setWebhookDeliveriesError("");
+        setWebhookAttemptsOpen(false);
+      }
+      setOpenTaskId("");
+      pushToast("success", "Opened task");
+    } catch (e) {
+      pushToast("error", `Open failed: ${String(e)}`);
+    } finally {
+      setOpenTaskBusy(false);
+    }
+  }
+
+  async function loadWebhookAttempts(taskId: string) {
+    if (!canViewWebhookDeliveries) return;
+    setWebhookDeliveriesLoading(true);
+    setWebhookDeliveriesError("");
+    try {
+      const rows = await Api.listWebhookDeliveries(taskId, 20);
+      setWebhookDeliveries(rows);
+      if (rows.length > 0) setWebhookLast(rows[0]);
+    } catch (e) {
+      setWebhookDeliveriesError(String(e));
+    } finally {
+      setWebhookDeliveriesLoading(false);
+    }
+  }
+
+  async function loadWebhookLast(taskId: string) {
+    if (!canViewWebhookDeliveries) return;
+    setWebhookDeliveriesError("");
+    try {
+      const last = await Api.getOpsWebhookLastDelivery(taskId);
+      setWebhookLast(last);
+    } catch (e) {
+      setWebhookLast(null);
+      setWebhookDeliveriesError(String(e));
+    }
+  }
+
+  async function resendWebhook(taskId: string) {
+    if (!canResendWebhook) return;
+    setWebhookResendRunning(true);
+    try {
+      const res = await Api.resendWebhook(taskId);
+      if (!res.enqueued) {
+        pushToast("error", `Resend skipped: ${res.reason ?? "not enqueued"}`);
+        return;
+      }
+      pushToast("success", "Webhook enqueued");
+      if (webhookAttemptsOpen) {
+        await loadWebhookAttempts(taskId);
+      } else {
+        await loadWebhookLast(taskId);
+      }
+    } catch (e) {
+      pushToast("error", `Resend failed: ${String(e)}`);
+    } finally {
+      setWebhookResendRunning(false);
+    }
   }
 
   async function refresh(options: { source?: "manual" | "auto" } = {}): Promise<{ ok: boolean; error?: string }> {
@@ -799,7 +1005,7 @@ export function OpsPage() {
           .then(setIncidents)
           .then(() => null)
           .catch((e) => `incidents: ${String(e)}`),
-        loadFlows()
+        loadFlows({ source })
           .then(() => null)
           .catch((e) => `flows: ${String(e)}`)
       ];
@@ -852,6 +1058,44 @@ export function OpsPage() {
   ]);
 
   useEffect(() => {
+    if (!showManualReviewQueue) return;
+    if (manualQueueAutoRefreshSeconds === 0 || !isPageVisible) return;
+    const timer = window.setInterval(() => {
+      if (manualQueueRefreshInFlightRef.current) return;
+      if (isRefreshing || isClaimRunning || isLockRenewing || lockRenewInFlightRef.current) return;
+      const now = Date.now();
+      const pausedUntil = manualQueuePausedUntilMsRef.current;
+      if (pausedUntil && now < pausedUntil) return;
+      manualQueueRefreshInFlightRef.current = true;
+      void loadFlows({ source: "auto" })
+        .then(() => resetManualQueueAutoRefreshPause())
+        .catch((e) => {
+          const msg = e instanceof Error ? e.message : String(e);
+          setManualQueueFailureCount((c) => {
+            const next = c + 1;
+            const pauseSeconds = Math.min(180, 10 * 2 ** Math.min(4, next - 1));
+            setManualQueuePausedUntilMs(Date.now() + pauseSeconds * 1000);
+            // Only toast on transition into pause (avoid noisy repeated toasts).
+            if (c === 0) pushToast("error", `Manual queue auto-refresh failed; pausing for ${pauseSeconds}s`);
+            return next;
+          });
+          setManualQueueLastError(msg);
+        })
+        .finally(() => {
+          manualQueueRefreshInFlightRef.current = false;
+        });
+    }, manualQueueAutoRefreshSeconds * 1000);
+    return () => window.clearInterval(timer);
+  }, [
+    isClaimRunning,
+    isLockRenewing,
+    isPageVisible,
+    isRefreshing,
+    manualQueueAutoRefreshSeconds,
+    showManualReviewQueue
+  ]);
+
+  useEffect(() => {
     if (autoRefreshSeconds === 0 || !isPageVisible) return;
     const timer = window.setInterval(() => {
       if (Date.now() < autoRefreshPausedUntilMs) return;
@@ -878,13 +1122,18 @@ export function OpsPage() {
   useEffect(() => {
     setSelectedTaskIds((prev) => prev.filter((id) => filteredFlows.some((t) => t.id === id)));
     if (selectedFlowId && !filteredFlows.some((t) => t.id === selectedFlowId)) {
+      if (pinnedFlowId && selectedFlowId === pinnedFlowId) return;
       setSelectedFlowId(filteredFlows[0]?.id ?? "");
     }
-  }, [filteredFlows, selectedFlowId]);
+  }, [filteredFlows, pinnedFlowId, selectedFlowId]);
 
   useEffect(() => {
     if (!selectedFlowId) {
       setSelectedFlow(null);
+      setWebhookLast(null);
+      setWebhookDeliveries([]);
+      setWebhookDeliveriesError("");
+      setWebhookAttemptsOpen(false);
       setAudit([]);
       setTimeline([]);
       setInspectorTab("summary");
@@ -897,22 +1146,17 @@ export function OpsPage() {
   }, [selectedFlowId]);
 
   useEffect(() => {
-    if (!showManualReviewQueue) return;
     if (!selectedFlowId) return;
-    if (manualReviewClaimState.active && !manualReviewClaimState.isMine) return;
-    if (claimedManualReviewIdRef.current === selectedFlowId) return;
-    claimedManualReviewIdRef.current = selectedFlowId;
-    setIsClaimRunning(true);
-    void Api.claimManualReview(selectedFlowId)
-      .then((task) => {
-        if (task && task.id === selectedFlowId) setSelectedFlow(task);
-      })
-      .catch((e) => {
-        pushToast("error", `Claim failed: ${String(e)}`);
-        return refreshRef.current?.();
-      })
-      .finally(() => setIsClaimRunning(false));
-  }, [manualReviewClaimState.active, manualReviewClaimState.isMine, selectedFlowId, showManualReviewQueue]);
+    if (!selectedFlow?.callback_url) {
+      setWebhookLast(null);
+      setWebhookDeliveries([]);
+      setWebhookDeliveriesError("");
+      return;
+    }
+    void loadWebhookLast(selectedFlowId);
+  }, [selectedFlow?.callback_url, selectedFlowId]);
+
+  // NOTE: Claim should be explicit (row click / Take next / hotkeys), not implicit from refresh/focus changes.
 
   useEffect(() => {
     if (!showManualReviewQueue) return;
@@ -1058,6 +1302,28 @@ export function OpsPage() {
     }
     setIsActionRunning(true);
     try {
+      if (showManualReviewQueue) {
+        const rowReview = (flows.find((t) => t.id === taskId) as any)?.review as
+          | { claimed_by?: string | null; claimed_until?: string | null }
+          | undefined;
+        const state = claimStateFromReview(rowReview, Date.now(), me);
+        if (state.isLocked) {
+          pushToast("error", "Cannot review: locked by another reviewer");
+          return;
+        }
+        if (!state.isMine) {
+          setIsClaimRunning(true);
+          try {
+            const claimed = await Api.claimManualReview(taskId);
+            claimedManualReviewIdRef.current = taskId;
+            if (selectedFlowId !== taskId) setSelectedFlowId(taskId);
+            setSelectedFlow((prev) => (prev && prev.id === taskId ? ({ ...(prev as any), review: claimed.review } as any) : claimed));
+            setFlows((prev) => prev.map((t) => (t.id === taskId ? ({ ...(t as any), review: claimed.review } as any) : t)));
+          } finally {
+            setIsClaimRunning(false);
+          }
+        }
+      }
       await Api.opsAction(taskId, { action: "manual_review", manual_verdict: verdict });
       if (showManualReviewQueue && selectedFlowId === taskId) {
         pendingManualReviewSelectRef.current = pickManualReviewAutoAdvanceId(taskId);
@@ -1153,14 +1419,147 @@ export function OpsPage() {
   function exportBulkReport() {
     if (lastBulkResults.length === 0) return;
     const blob = new Blob([JSON.stringify(lastBulkResults, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `bulk-report-${Date.now()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    downloadBlobAsFile(blob, `bulk-report-${Date.now()}.json`);
+  }
+
+  function exportFlowsCsv() {
+    const rows = sortedFlows;
+    const header = [
+      "id",
+      "account_id",
+      "task_type",
+      "status",
+      "updated_at",
+      "created_at",
+      "worker_id",
+      "review_status",
+      "claimed_by",
+      "claimed_until",
+      "artifacts_count"
+    ];
+    const lines = [header.map(csvCell).join(",")];
+    for (const t of rows) {
+      const review = (t as any)?.review as
+        | { review_status?: string; claimed_by?: string | null; claimed_until?: string | null }
+        | undefined;
+      const artifactsCount = Array.isArray((t as any)?.artifacts) ? (t as any).artifacts.length : 0;
+      const line = [
+        t.id,
+        (t as any).account_id ?? "",
+        (t as any).task_type ?? "",
+        (t as any).status ?? "",
+        (t as any).updated_at ?? "",
+        (t as any).created_at ?? "",
+        (t as any).worker_id ?? "",
+        review?.review_status ?? "",
+        review?.claimed_by ?? "",
+        review?.claimed_until ?? "",
+        String(artifactsCount)
+      ];
+      lines.push(line.map(csvCell).join(","));
+    }
+    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
+    downloadBlobAsFile(blob, `ops-flows-${stamp}.csv`);
+    pushToast("success", `Exported ${rows.length} flows (CSV)`);
+  }
+
+  function exportFlowsJson() {
+    const rows = sortedFlows;
+    const payload = rows.map((t) => {
+      const review = (t as any)?.review as
+        | { review_status?: string; claimed_by?: string | null; claimed_until?: string | null }
+        | undefined;
+      const artifactsCount = Array.isArray((t as any)?.artifacts) ? (t as any).artifacts.length : 0;
+      return {
+        id: t.id,
+        account_id: (t as any).account_id ?? null,
+        task_type: (t as any).task_type ?? null,
+        status: (t as any).status ?? null,
+        updated_at: (t as any).updated_at ?? null,
+        created_at: (t as any).created_at ?? null,
+        worker_id: (t as any).worker_id ?? null,
+        review_status: review?.review_status ?? null,
+        claimed_by: review?.claimed_by ?? null,
+        claimed_until: review?.claimed_until ?? null,
+        artifacts_count: artifactsCount
+      };
+    });
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
+    downloadBlobAsFile(blob, `ops-flows-${stamp}.json`);
+    pushToast("success", `Exported ${rows.length} flows (JSON)`);
+  }
+
+  async function downloadSelectedBundles() {
+    if (!canDownloadBundle) return;
+    const taskIds = Array.from(new Set(selectedTaskIds));
+    if (taskIds.length === 0) return;
+    if (isDownloadRunning) return;
+    setIsDownloadRunning(true);
+    setDownloadProgress({ done: 0, total: taskIds.length, mode: "multi" });
+    try {
+      let ok = 0;
+      let fail = 0;
+      let done = 0;
+      for (const taskId of taskIds) {
+        try {
+          const { blob, filename } = await Api.downloadOpsFlowBundle(taskId);
+          downloadBlobAsFile(blob, filename);
+          ok += 1;
+          await new Promise((r) => window.setTimeout(r, 150));
+        } catch (e) {
+          fail += 1;
+          pushToast("error", `Bundle download failed for ${shortId(taskId)}: ${String(e)}`);
+        } finally {
+          done += 1;
+          setDownloadProgress((prev) => (prev ? { ...prev, done } : prev));
+        }
+      }
+      if (fail === 0) pushToast("success", `Downloaded ${ok} bundle(s)`);
+      else pushToast("error", `Downloaded ${ok} bundle(s), failed ${fail}`);
+    } finally {
+      setIsDownloadRunning(false);
+      setDownloadProgress(null);
+    }
+  }
+
+  async function downloadSelectedBundlesZip() {
+    if (!canDownloadBundle) return;
+    const taskIds = Array.from(new Set(selectedTaskIds));
+    if (taskIds.length < 2) return;
+    if (isDownloadRunning) return;
+    setIsDownloadRunning(true);
+    setDownloadProgress({ done: 0, total: taskIds.length, mode: "zip" });
+    try {
+      const { blob, filename } = await Api.downloadOpsFlowBundlesZip(taskIds);
+      downloadBlobAsFile(blob, filename);
+      setDownloadProgress((prev) => (prev ? { ...prev, done: prev.total } : prev));
+      pushToast("success", `Downloaded 1 zip with ${taskIds.length} bundle(s)`);
+    } catch (e) {
+      pushToast("error", `Bulk zip download failed: ${String(e)}`);
+    } finally {
+      setIsDownloadRunning(false);
+      setDownloadProgress(null);
+    }
+  }
+
+  function confirmIfManyDownloads(count: number, mode: "multi" | "zip", onConfirm: () => void) {
+    const threshold = 10;
+    if (count <= threshold) {
+      onConfirm();
+      return;
+    }
+    const noun = mode === "zip" ? "a single zip file" : `${count} zip files`;
+    openConfirmDialog(
+      {
+        title: "Download many bundles?",
+        message: `You’re about to download ${count} bundle(s) as ${noun}. Continue?`,
+        applyText: mode === "zip" ? `Download 1 zip (${count})` : `Download ${count} files`,
+        danger: false
+      },
+      onConfirm
+    );
   }
 
   function toggleTaskSelection(taskId: string) {
@@ -1187,9 +1586,7 @@ export function OpsPage() {
       setShowOnlyProblem(false);
       setShowSlaBreachQueue(false);
       setShowManualReviewQueue(false);
-      setShowLockedManualReview(false);
-      setManualReviewMineOnly(false);
-      setManualReviewLockedOnly(false);
+      setManualReviewFocus("queue");
       return;
     }
     if (preset === "overdue") {
@@ -1199,9 +1596,7 @@ export function OpsPage() {
       setShowOnlyProblem(true);
       setShowSlaBreachQueue(true);
       setShowManualReviewQueue(false);
-      setShowLockedManualReview(false);
-      setManualReviewMineOnly(false);
-      setManualReviewLockedOnly(false);
+      setManualReviewFocus("queue");
       return;
     }
     if (preset === "disputed") {
@@ -1211,9 +1606,7 @@ export function OpsPage() {
       setShowOnlyProblem(false);
       setShowSlaBreachQueue(false);
       setShowManualReviewQueue(false);
-      setShowLockedManualReview(false);
-      setManualReviewMineOnly(false);
-      setManualReviewLockedOnly(false);
+      setManualReviewFocus("queue");
       return;
     }
     if (preset === "manual_review") {
@@ -1223,9 +1616,7 @@ export function OpsPage() {
       setShowOnlyProblem(false);
       setShowSlaBreachQueue(false);
       setShowManualReviewQueue(true);
-      setShowLockedManualReview(false);
-      setManualReviewMineOnly(false);
-      setManualReviewLockedOnly(false);
+      setManualReviewFocus("queue");
       return;
     }
     setStatusFilter("");
@@ -1234,9 +1625,7 @@ export function OpsPage() {
     setShowOnlyProblem(false);
     setShowSlaBreachQueue(true);
     setShowManualReviewQueue(false);
-    setShowLockedManualReview(false);
-    setManualReviewMineOnly(false);
-    setManualReviewLockedOnly(false);
+    setManualReviewFocus("queue");
   }
 
   async function openFlowQueuePreset(preset: "overdue" | "disputed" | "sla_risk" | "manual_review" | "clear") {
@@ -1269,11 +1658,10 @@ export function OpsPage() {
       showOnlyProblem,
       showSlaBreachQueue,
       showManualReviewQueue,
-      showLockedManualReview,
-      manualReviewMineOnly,
-      manualReviewLockedOnly,
+      manualReviewFocus,
       sortMode,
-      pageSize
+      pageSize,
+      flowQueueView
     };
     setSavedViews((prev) => [view, ...prev].slice(0, 12));
     setNewSavedViewName("");
@@ -1287,11 +1675,10 @@ export function OpsPage() {
     setShowOnlyProblem(view.showOnlyProblem);
     setShowSlaBreachQueue(view.showSlaBreachQueue);
     setShowManualReviewQueue(view.showManualReviewQueue);
-    setShowLockedManualReview(view.showLockedManualReview);
-    setManualReviewMineOnly(view.manualReviewMineOnly);
-    setManualReviewLockedOnly(view.manualReviewLockedOnly);
+    setManualReviewFocus(view.manualReviewFocus || "queue");
     setSortMode(view.sortMode);
     setPageSize(view.pageSize);
+    setFlowQueueView(view.flowQueueView || "list");
     setPage(1);
     pushToast("success", `Loaded view "${view.name}"`);
   }
@@ -1305,14 +1692,23 @@ export function OpsPage() {
     if (sortedFlows.length === 0) return;
     const idx = sortedFlows.findIndex((t) => t.id === selectedFlowId);
     const nextIdx = idx < 0 ? 0 : Math.min(sortedFlows.length - 1, idx + 1);
-    void claimAndSelectFlow(sortedFlows[nextIdx].id);
+    if (showManualReviewQueue) {
+      // Navigation in manual review should be client-side only; claiming is explicit.
+      setSelectedFlowId(sortedFlows[nextIdx].id);
+      return;
+    }
+    setSelectedFlowId(sortedFlows[nextIdx].id);
   }
 
   function selectPrevFlow() {
     if (sortedFlows.length === 0) return;
     const idx = sortedFlows.findIndex((t) => t.id === selectedFlowId);
     const prevIdx = idx < 0 ? 0 : Math.max(0, idx - 1);
-    void claimAndSelectFlow(sortedFlows[prevIdx].id);
+    if (showManualReviewQueue) {
+      setSelectedFlowId(sortedFlows[prevIdx].id);
+      return;
+    }
+    setSelectedFlowId(sortedFlows[prevIdx].id);
   }
 
   function pickManualReviewAutoAdvanceId(taskId: string): string | null {
@@ -1528,9 +1924,7 @@ export function OpsPage() {
                 setShowOnlyProblem(false);
                 setShowSlaBreachQueue(false);
                 setShowManualReviewQueue(false);
-                setShowLockedManualReview(false);
-                setManualReviewMineOnly(false);
-                setManualReviewLockedOnly(false);
+                setManualReviewFocus("queue");
                 setStatusFilter((prev) => (prev === status ? "" : status));
                 setPage(1);
                 void refresh();
@@ -1659,20 +2053,64 @@ export function OpsPage() {
           </div>
         </div>
         <p className="muted">Shortcuts: <span className="mono">J/K</span> navigate, <span className="mono">A</span> approve, <span className="mono">1/2</span> approve/reject (manual review), <span className="mono">C</span> recheck, <span className="mono">R</span> refund, <span className="mono">D</span> dispute.</p>
-        {showManualReviewQueue ? (
-          <div className="row-tight">
-            <span className="muted" title="Manual review queue prioritizes unclaimed/expired first, then your claimed, and locks held by others last.">
-              Order: <span className="mono">unclaimed</span> → <span className="mono">mine</span> → <span className="mono">locked</span>
-            </span>
-            <Button
-              view="action"
-              data-testid="ops-manual-take-next"
-              onClick={() => {
-                setIsClaimRunning(true);
-                void Api.claimNextManualReview({ status: statusFilter || undefined, taskType: taskTypeFilter || undefined })
-                  .then((task) => {
-                    if (!task) {
-                      pushToast("error", "Manual review queue is empty");
+        <div className="row-tight" style={{ alignItems: "center", flexWrap: "wrap", marginBottom: 6 }}>
+          <TextInput
+            size="m"
+            value={openTaskId}
+            onUpdate={setOpenTaskId}
+            placeholder="Open by Task ID (UUID)"
+            disabled={openTaskBusy}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void openFlowById();
+              }
+            }}
+            qa="ops-open-by-id-input"
+          />
+          <Button
+            view="outlined"
+            disabled={openTaskBusy || !openTaskId.trim()}
+            loading={openTaskBusy}
+            onClick={() => void openFlowById()}
+            data-testid="ops-open-by-id"
+          >
+            Open
+          </Button>
+          {pinnedFlowId ? (
+            <>
+              <span className="chip chip-muted" title="Inspector is pinned to a specific Task ID (may be outside current filters)">
+                pinned
+              </span>
+              <span className="muted mono">{pinnedFlowId.slice(0, 8)}…</span>
+              <Button
+                view="flat"
+                size="s"
+                onClick={() => {
+                  setPinnedFlowId("");
+                  if (selectedFlowId && !filteredFlows.some((t) => t.id === selectedFlowId)) setSelectedFlowId(filteredFlows[0]?.id ?? "");
+                }}
+              >
+                Unpin
+              </Button>
+            </>
+          ) : null}
+        </div>
+	        {showManualReviewQueue ? (
+	          <div className="row-tight">
+	            <span className="muted" title="Manual review queue prioritizes unclaimed/expired first, then your claimed, and locks held by others last.">
+	              Order: <span className="mono">unclaimed</span> → <span className="mono">mine</span> → <span className="mono">locked</span>
+	            </span>
+	            <Button
+	              view="action"
+	              data-testid="ops-manual-take-next"
+	              onClick={() => {
+	                if (manualReviewFocus === "locked") setManualReviewFocus("queue");
+	                setIsClaimRunning(true);
+	                void Api.claimNextManualReview({ status: statusFilter || undefined, taskType: taskTypeFilter || undefined })
+	                  .then((task) => {
+	                    if (!task) {
+	                      pushToast("error", "Manual review queue is empty");
                       return;
                     }
                     pendingManualReviewSelectRef.current = task.id;
@@ -1681,60 +2119,55 @@ export function OpsPage() {
                   .catch((e) => pushToast("error", `Claim next failed: ${String(e)}`))
                   .finally(() => setIsClaimRunning(false));
               }}
-              disabled={isClaimRunning || isRefreshing}
-              loading={isClaimRunning}
-            >
-              Take next
-            </Button>
-            <Button
-              view={showLockedManualReview ? "action" : "outlined"}
-              onClick={() =>
-                setShowLockedManualReview((v) => {
-                  const next = !v;
-                  if (!next) setManualReviewLockedOnly(false);
-                  return next;
-                })
-              }
-              disabled={isRefreshing}
-              title="Show tasks claimed by other reviewers"
-            >
-              Show locked
-            </Button>
-            <Button
-              view={manualReviewMineOnly ? "action" : "outlined"}
-              onClick={() => {
-                setManualReviewMineOnly((v) => {
-                  const next = !v;
-                  if (next) setManualReviewLockedOnly(false);
-                  return next;
-                });
-              }}
-              disabled={isRefreshing}
-              title="Show only tasks claimed by you"
-            >
-              Mine only
-            </Button>
-            <Button
-              view={manualReviewLockedOnly ? "action" : "outlined"}
-              onClick={() => {
-                setManualReviewLockedOnly((v) => {
-                  const next = !v;
-                  if (next) {
-                    setManualReviewMineOnly(false);
-                    setShowLockedManualReview(true);
-                  }
-                  return next;
-                });
-              }}
-              disabled={isRefreshing}
-              title="Show only tasks locked by other reviewers"
-            >
-              Locked only
-            </Button>
-            <Button
-              view={manualReviewAutoRenew ? "action" : "outlined"}
-              data-testid="ops-manual-auto-renew"
-              onClick={() => setManualReviewAutoRenew((v) => !v)}
+	              disabled={isClaimRunning || isRefreshing}
+	              loading={isClaimRunning}
+	            >
+	              Take next
+	            </Button>
+	            <div
+	              className="segmented"
+	              role="radiogroup"
+	              aria-label="Manual review filter"
+	              title="Filter the manual review queue"
+	            >
+	              <button
+	                type="button"
+	                className={`segmented-btn ${manualReviewFocus === "queue" ? "is-active" : ""}`}
+	                role="radio"
+	                aria-checked={manualReviewFocus === "queue"}
+	                onClick={() => setManualReviewFocus("queue")}
+	                disabled={isRefreshing}
+	                title="Show full manual review queue"
+	              >
+	                Queue <span className="segmented-count">{manualReviewCounts.queue}</span>
+	              </button>
+	              <button
+	                type="button"
+	                className={`segmented-btn ${manualReviewFocus === "mine" ? "is-active" : ""}`}
+	                role="radio"
+	                aria-checked={manualReviewFocus === "mine"}
+	                onClick={() => setManualReviewFocus("mine")}
+	                disabled={isRefreshing}
+	                title="Show only flows claimed by you"
+	              >
+	                Mine <span className="segmented-count">{manualReviewCounts.mine}</span>
+	              </button>
+	              <button
+	                type="button"
+	                className={`segmented-btn ${manualReviewFocus === "locked" ? "is-active" : ""}`}
+	                role="radio"
+	                aria-checked={manualReviewFocus === "locked"}
+	                onClick={() => setManualReviewFocus("locked")}
+	                disabled={isRefreshing}
+	                title="Show only flows locked by other reviewers"
+	              >
+	                Locked <span className="segmented-count">{manualReviewCounts.locked}</span>
+	              </button>
+	            </div>
+	            <Button
+	              view={manualReviewAutoRenew ? "action" : "outlined"}
+	              data-testid="ops-manual-auto-renew"
+	              onClick={() => setManualReviewAutoRenew((v) => !v)}
               disabled={isRefreshing}
               title={
                 !manualReviewAutoRenew
@@ -1748,6 +2181,44 @@ export function OpsPage() {
             >
               Auto-renew
             </Button>
+            <Button
+              view={manualQueueAutoRefreshSeconds === 0 ? "outlined" : "action"}
+              onClick={() =>
+                setManualQueueAutoRefreshSeconds((v) => (v === 0 ? 5 : v === 5 ? 15 : v === 15 ? 30 : 0))
+              }
+              disabled={isRefreshing}
+              title={
+                manualQueueAutoRefreshSeconds === 0
+                  ? "Queue auto-refresh is off"
+                  : `Queue auto-refresh every ${manualQueueAutoRefreshSeconds}s`
+              }
+              data-testid="ops-manual-queue-auto-refresh"
+            >
+              Queue auto-refresh
+            </Button>
+            <span
+              className="muted mono"
+              data-testid="ops-manual-queue-auto-refresh-status"
+              title={
+                manualQueueLastError
+                  ? `Last error: ${manualQueueLastError}${manualQueueFailureCount ? ` · failures: ${manualQueueFailureCount}` : ""}`
+                  : manualQueueFailureCount
+                    ? `Failures: ${manualQueueFailureCount}`
+                    : "Queue auto-refresh status"
+              }
+              style={{ whiteSpace: "nowrap" }}
+            >
+              {manualQueueAutoRefreshSeconds === 0
+                ? "queue: off"
+                : manualQueuePausedUntilMs && nowMs < manualQueuePausedUntilMs
+                  ? `queue: paused ${formatRemaining(manualQueuePausedUntilMs - nowMs)}`
+                  : "queue: on"}
+            </span>
+            {manualQueueAutoRefreshSeconds !== 0 && manualQueuePausedUntilMs && nowMs < manualQueuePausedUntilMs ? (
+              <Button view="flat" size="s" onClick={resetManualQueueAutoRefreshPause}>
+                Resume
+              </Button>
+            ) : null}
             <span
               className="muted mono"
               data-testid="ops-manual-auto-renew-status"
@@ -1836,21 +2307,37 @@ export function OpsPage() {
             ]}
             onUpdate={(items) => setSortMode((items[0] as SortMode) ?? "updated_desc")}
           />
-          <Button
-            view="flat"
-            onClick={() => {
-              setStatusFilter("");
-              setTaskTypeFilter("");
-              setSearchQuery("");
-              setShowLockedManualReview(false);
-              setManualReviewMineOnly(false);
-              setManualReviewLockedOnly(false);
-            }}
-          >
-            Clear
-          </Button>
-          <Button view="outlined" onClick={toggleSelectAllVisible}>Select page</Button>
-        </div>
+	          <Button
+	            view="flat"
+	            onClick={() => {
+	              setStatusFilter("");
+	              setTaskTypeFilter("");
+	              setSearchQuery("");
+	              setManualReviewFocus("queue");
+	            }}
+	          >
+	            Clear
+		          </Button>
+	          <Button view="outlined" onClick={toggleSelectAllVisible}>Select page</Button>
+	          <Button
+	            view="outlined"
+	            data-testid="ops-export-csv"
+	            disabled={sortedFlows.length === 0 || isRefreshing}
+	            onClick={exportFlowsCsv}
+	            title={`Export ${sortedFlows.length} flow(s) as CSV`}
+	          >
+	            Export CSV
+	          </Button>
+	          <Button
+	            view="outlined"
+	            data-testid="ops-export-json"
+	            disabled={sortedFlows.length === 0 || isRefreshing}
+	            onClick={exportFlowsJson}
+	            title={`Export ${sortedFlows.length} flow(s) as JSON`}
+	          >
+	            Export JSON
+	          </Button>
+	        </div>
         <div className="row-tight">
           <span className="muted">Presets:</span>
           <Button view="outlined" onClick={() => applyFlowPreset("overdue")}>Only overdue</Button>
@@ -1858,6 +2345,9 @@ export function OpsPage() {
           <Button view="outlined" onClick={() => applyFlowPreset("sla_risk")}>SLA risk</Button>
           <Button view="outlined" data-testid="ops-preset-manual-review" onClick={() => applyFlowPreset("manual_review")}>Manual review</Button>
           <Button view="flat" onClick={() => applyFlowPreset("clear")}>Reset</Button>
+          <span className="muted" style={{ marginLeft: 8 }}>View:</span>
+          <Button view={flowQueueView === "list" ? "action" : "outlined"} onClick={() => setFlowQueueView("list")}>List</Button>
+          <Button view={flowQueueView === "tiles" ? "action" : "outlined"} onClick={() => setFlowQueueView("tiles")}>Tiles</Button>
         </div>
         <div className="row-tight">
           <TextInput
@@ -1872,12 +2362,12 @@ export function OpsPage() {
           {savedViews.length === 0 ? <p className="muted">No saved views yet.</p> : null}
           {savedViews.map((view) => (
             <div key={view.id} className="saved-view-item">
-              <div className="saved-view-main">
-                <strong>{view.name}</strong>
-                <p className="muted">
-                  status: {view.statusFilter || "any"} · type: {view.taskTypeFilter || "any"} · problem: {view.showOnlyProblem ? "yes" : "no"} · sla: {view.showSlaBreachQueue ? "yes" : "no"} · manual: {view.showManualReviewQueue ? "yes" : "no"} · sort: {view.sortMode} · size: {view.pageSize}
-                </p>
-              </div>
+	              <div className="saved-view-main">
+	                <strong>{view.name}</strong>
+	                <p className="muted">
+	                  status: {view.statusFilter || "any"} · type: {view.taskTypeFilter || "any"} · problem: {view.showOnlyProblem ? "yes" : "no"} · sla: {view.showSlaBreachQueue ? "yes" : "no"} · manual: {view.showManualReviewQueue ? "yes" : "no"} · manual focus: {view.manualReviewFocus} · sort: {view.sortMode} · size: {view.pageSize} · view: {view.flowQueueView}
+	                </p>
+	              </div>
               <div className="row-tight">
                 <Button view="flat" onClick={() => applySavedView(view)}>Load</Button>
                 <Button view="flat-danger" onClick={() => deleteSavedView(view.id)}>Delete</Button>
@@ -1899,8 +2389,8 @@ export function OpsPage() {
             onUpdate={(items) => setPageSize(Number(items[0] ?? "25"))}
           />
         </div>
-        <p className="muted">Selected: {selectedTaskIds.length}</p>
-        <div className="list">
+        <p className="muted" data-testid="ops-selected-count">Selected: {selectedTaskIds.length}</p>
+        <div className={flowQueueView === "tiles" ? "flow-grid" : "list"} data-testid="ops-flow-list">
           {isRefreshing && pagedFlows.length === 0 ? <p className="muted">Loading flows…</p> : null}
           {!isRefreshing && pagedFlows.length === 0 ? <p className="muted">No flows for selected filter.</p> : null}
           {pagedFlows.map((t) => {
@@ -1927,7 +2417,7 @@ export function OpsPage() {
                 key={t.id}
                 data-testid="ops-flow-row"
                 data-task-id={t.id}
-                className={`task-row ${selectedFlowId === t.id ? "is-active" : ""} ${claimActive ? (claimIsMine ? "claim-mine" : "claim-locked") : ""}`}
+                className={`task-row ${flowQueueView === "tiles" ? "flow-tile" : ""} ${selectedFlowId === t.id ? "is-active" : ""} ${claimActive ? (claimIsMine ? "claim-mine" : "claim-locked") : ""}`}
                 onClick={() => void claimAndSelectFlow(t.id)}
                 role="button"
                 tabIndex={0}
@@ -1939,72 +2429,145 @@ export function OpsPage() {
                   }
                 }}
               >
-                <div className="task-main">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={() => toggleTaskSelection(t.id)}
-                  />
-                  <div>
-                    <div className="task-type">{t.task_type}</div>
-                    <div className="muted mono">{shortId(t.id)} · {shortId(t.account_id)}</div>
-                    {reviewLabel ? (
-                      <div className="muted">
-                        review: <span className="mono">{reviewLabel}</span>
-                        {scoreLabel ? (
-                          <span className="mono" title={reasonLabel ? `reason: ${reasonLabel}` : undefined}>
-                            {" "}· score {scoreLabel}{providerLabel ? ` (${providerLabel})` : ""}
-                          </span>
-                        ) : null}
-                        {artifactsCount ? <span className="mono"> · artifacts {artifactsCount}</span> : null}
-                        {showManualReviewQueue && claimActive ? (
-                          <>
-                            <span
-                              data-testid="ops-claim-badge"
-                              data-claim-state={claimIsMine ? "mine" : "locked"}
-                              className={`claim-badge ${claimIsMine ? "claim-badge-mine" : "claim-badge-locked"}`}
-                              title={claimBadgeTitle}
-                            >
-                              {claimIsMine ? "CLAIMED" : "LOCKED"}
-                              {claimRemaining ? ` ${claimRemaining}` : ""}
+                {flowQueueView === "tiles" ? (
+                  <>
+                    <div className="flow-tile-head">
+                      <div className="row-tight" style={{ justifyContent: "space-between", alignItems: "center" }}>
+                        <div className="row-tight" style={{ alignItems: "center", flexWrap: "wrap" }}>
+                          <span className="chip mono">{t.task_type}</span>
+                          {reviewLabel ? <span className="chip">review {reviewLabel}</span> : <span className="chip muted">review none</span>}
+                          {scoreLabel ? (
+                            <span className="chip mono" title={reasonLabel ? `reason: ${reasonLabel}` : undefined}>
+                              score {scoreLabel}{providerLabel ? ` (${providerLabel})` : ""}
                             </span>
-                            {!claimIsMine && canSeeClaimOwner ? (
-                              <span className="muted mono" title={claimedBy}>
-                                {" "}by {claimedByLabel}
+                          ) : null}
+                          {artifactsCount ? <span className="chip mono">artifacts {artifactsCount}</span> : null}
+                        </div>
+                        <span className={`status status-${t.status}`}>{t.status}</span>
+                      </div>
+                      <div className="muted mono" style={{ marginTop: 6 }}>
+                        {shortId(t.id)} · {shortId(t.account_id)}
+                      </div>
+                      {showManualReviewQueue && claimActive ? (
+                        <div className="row-tight" style={{ marginTop: 6, alignItems: "center", flexWrap: "wrap" }}>
+                          <span
+                            data-testid="ops-claim-badge"
+                            data-claim-state={claimIsMine ? "mine" : "locked"}
+                            className={`claim-badge ${claimIsMine ? "claim-badge-mine" : "claim-badge-locked"}`}
+                            title={claimBadgeTitle}
+                          >
+                            {claimIsMine ? "CLAIMED" : "LOCKED"}
+                            {claimRemaining ? ` ${claimRemaining}` : ""}
+                          </span>
+                          {!claimIsMine && canSeeClaimOwner ? (
+                            <span className="muted mono" title={claimedBy}>
+                              by {claimedByLabel}
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="flow-tile-actions" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={() => toggleTaskSelection(t.id)}
+                      />
+                      {showManualReviewQueue && canAction("manual_review") && reviewLabel === "manual_required" ? (
+                        <div className="row-tight">
+                          <Button
+                            size="s"
+                            view="action"
+                            onClick={() => void runManualReview(t.id, "approved")}
+                            disabled={manualReviewButtonsDisabled}
+                            title={manualReviewButtonsDisabled ? "Locked by another reviewer" : undefined}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            size="s"
+                            view="flat-danger"
+                            onClick={() => void runManualReview(t.id, "rejected")}
+                            disabled={manualReviewButtonsDisabled}
+                            title={manualReviewButtonsDisabled ? "Locked by another reviewer" : undefined}
+                          >
+                            Reject
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="task-main">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={() => toggleTaskSelection(t.id)}
+                      />
+                      <div>
+                        <div className="task-type">{t.task_type}</div>
+                        <div className="muted mono">{shortId(t.id)} · {shortId(t.account_id)}</div>
+                        {reviewLabel ? (
+                          <div className="muted">
+                            review: <span className="mono">{reviewLabel}</span>
+                            {scoreLabel ? (
+                              <span className="mono" title={reasonLabel ? `reason: ${reasonLabel}` : undefined}>
+                                {" "}· score {scoreLabel}{providerLabel ? ` (${providerLabel})` : ""}
                               </span>
                             ) : null}
-                          </>
+                            {artifactsCount ? <span className="mono"> · artifacts {artifactsCount}</span> : null}
+                            {showManualReviewQueue && claimActive ? (
+                              <>
+                                <span
+                                  data-testid="ops-claim-badge"
+                                  data-claim-state={claimIsMine ? "mine" : "locked"}
+                                  className={`claim-badge ${claimIsMine ? "claim-badge-mine" : "claim-badge-locked"}`}
+                                  title={claimBadgeTitle}
+                                >
+                                  {claimIsMine ? "CLAIMED" : "LOCKED"}
+                                  {claimRemaining ? ` ${claimRemaining}` : ""}
+                                </span>
+                                {!claimIsMine && canSeeClaimOwner ? (
+                                  <span className="muted mono" title={claimedBy}>
+                                    {" "}by {claimedByLabel}
+                                  </span>
+                                ) : null}
+                              </>
+                            ) : null}
+                          </div>
                         ) : null}
                       </div>
-                    ) : null}
-                  </div>
-                </div>
-                <div className="row-tight">
-                  {showManualReviewQueue && canAction("manual_review") && reviewLabel === "manual_required" ? (
-                    <div className="row-tight" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        size="s"
-                        view="action"
-                        onClick={() => void runManualReview(t.id, "approved")}
-                        disabled={manualReviewButtonsDisabled}
-                        title={manualReviewButtonsDisabled ? "Locked by another reviewer" : undefined}
-                      >
-                        Approve
-                      </Button>
-                      <Button
-                        size="s"
-                        view="flat-danger"
-                        onClick={() => void runManualReview(t.id, "rejected")}
-                        disabled={manualReviewButtonsDisabled}
-                        title={manualReviewButtonsDisabled ? "Locked by another reviewer" : undefined}
-                      >
-                        Reject
-                      </Button>
                     </div>
-                  ) : null}
-                  <span className={`status status-${t.status}`}>{t.status}</span>
-                </div>
+                    <div className="row-tight">
+                      {showManualReviewQueue && canAction("manual_review") && reviewLabel === "manual_required" ? (
+                        <div className="row-tight" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            size="s"
+                            view="action"
+                            onClick={() => void runManualReview(t.id, "approved")}
+                            disabled={manualReviewButtonsDisabled}
+                            title={manualReviewButtonsDisabled ? "Locked by another reviewer" : undefined}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            size="s"
+                            view="flat-danger"
+                            onClick={() => void runManualReview(t.id, "rejected")}
+                            disabled={manualReviewButtonsDisabled}
+                            title={manualReviewButtonsDisabled ? "Locked by another reviewer" : undefined}
+                          >
+                            Reject
+                          </Button>
+                        </div>
+                      ) : null}
+                      <span className={`status status-${t.status}`}>{t.status}</span>
+                    </div>
+                  </>
+                )}
               </div>
             );
           })}
@@ -2184,10 +2747,62 @@ export function OpsPage() {
                 >
                   Bulk reassign
                 </Button>
-                <Button view="flat" disabled={lastBulkResults.length === 0} onClick={exportBulkReport}>
-                  Export bulk report
-                </Button>
-              </div>
+	                <Button view="flat" disabled={lastBulkResults.length === 0} onClick={exportBulkReport}>
+	                  Export bulk report
+	                </Button>
+		                {canDownloadBundle ? (
+		                  <Button
+		                    view="flat"
+		                    data-testid="ops-download-selected-bundles"
+		                    disabled={selectedTaskIds.length === 0 || isDownloadRunning || isBulkRunning}
+		                    loading={isDownloadRunning && downloadProgress?.mode === "multi"}
+		                    onClick={() => {
+                          const count = Array.from(new Set(selectedTaskIds)).length;
+                          confirmIfManyDownloads(count, "multi", () => void downloadSelectedBundles());
+                        }}
+		                    title={
+	                        selectedTaskIds.length === 0
+	                          ? "Select 1+ flows (checkboxes) to enable bulk download"
+	                          : actionDisabledTitle("download_bundle")
+	                      }
+		                  >
+		                    {isDownloadRunning && downloadProgress?.mode === "multi"
+                          ? `Downloading ${downloadProgress.done}/${downloadProgress.total}`
+                          : `Download selected bundles${selectedTaskIds.length ? ` (${selectedTaskIds.length})` : ""}`}
+		                  </Button>
+		                ) : null}
+                    {canDownloadBundle ? (
+                      <Button
+                        view="flat"
+                        data-testid="ops-download-selected-bundles-zip"
+                        disabled={selectedTaskIds.length < 2 || isDownloadRunning || isBulkRunning}
+                        loading={isDownloadRunning && downloadProgress?.mode === "zip"}
+                        onClick={() => {
+                          const count = Array.from(new Set(selectedTaskIds)).length;
+                          confirmIfManyDownloads(count, "zip", () => void downloadSelectedBundlesZip());
+                        }}
+                        title={
+                          selectedTaskIds.length < 2
+                            ? "Select 2+ flows to enable single-zip download"
+                            : "Download all selected bundles as one zip"
+                        }
+                      >
+                        {isDownloadRunning && downloadProgress?.mode === "zip"
+                          ? `Preparing zip ${downloadProgress.done}/${downloadProgress.total}`
+                          : `Download as one zip${selectedTaskIds.length ? ` (${selectedTaskIds.length})` : ""}`}
+                      </Button>
+                    ) : null}
+                    {downloadProgress ? (
+                      <span
+                        className="muted mono"
+                        data-testid="ops-download-progress"
+                        title="Bulk download progress"
+                        style={{ whiteSpace: "nowrap" }}
+                      >
+                        download {downloadProgress.done}/{downloadProgress.total}
+                      </span>
+                    ) : null}
+		              </div>
               </div>
             </div>
           </>
@@ -2201,24 +2816,17 @@ export function OpsPage() {
           <h2>Flow Inspector</h2>
           {selectedFlow ? (
             <div className="row-tight">
-              {canDownloadBundle ? (
-                <Button
-                  view="flat"
-                  onClick={() => {
-                    void Api.downloadOpsFlowBundle(selectedFlow.id)
-                      .then(({ blob, filename }) => {
-                        const url = URL.createObjectURL(blob);
-                        const link = document.createElement("a");
-                        link.href = url;
-                        link.download = filename;
-                        document.body.appendChild(link);
-                        link.click();
-                        link.remove();
-                        URL.revokeObjectURL(url);
-                        pushToast("success", "Downloaded flow bundle");
-                      })
-                      .catch((e) => pushToast("error", `Bundle download failed: ${String(e)}`));
-                  }}
+	              {canDownloadBundle ? (
+	                <Button
+	                  view="flat"
+	                  onClick={() => {
+	                    void Api.downloadOpsFlowBundle(selectedFlow.id)
+	                      .then(({ blob, filename }) => {
+	                        downloadBlobAsFile(blob, filename);
+	                        pushToast("success", "Downloaded flow bundle");
+	                      })
+	                      .catch((e) => pushToast("error", `Bundle download failed: ${String(e)}`));
+	                  }}
                   title={actionDisabledTitle("download_bundle")}
                 >
                   Download bundle
@@ -2264,6 +2872,115 @@ export function OpsPage() {
                       <span className="muted mono"> · redaction {selectedFlow.review.auto_check_redacted ? "on" : "off"}</span>
                     ) : null}
                   </p>
+                ) : null}
+                <p>
+                  <strong>Callback:</strong>{" "}
+                  {selectedFlow.callback_url ? (
+                    <>
+                      <span className="mono">{selectedFlow.callback_url}</span>{" "}
+                      <Button size="s" view="flat" onClick={() => void copyText(selectedFlow.callback_url ?? "")}>Copy</Button>
+                    </>
+                  ) : (
+                    <span className="muted">none</span>
+                  )}
+                </p>
+                {selectedFlow.callback_url ? (
+                  <div className="detail-block" data-testid="ops-webhook-last">
+                    <p className="muted" style={{ marginTop: 0 }}>
+                      Webhook delivery
+                    </p>
+                    {!canViewWebhookDeliveries ? (
+                      <p className="muted" style={{ marginBottom: 0 }}>
+                        Hidden for role <span className="mono">{role}</span>
+                      </p>
+                    ) : (
+                      <>
+                        {webhookDeliveriesError ? (
+                          <p className="muted" style={{ marginBottom: 0 }}>
+                            error: {shortError(webhookDeliveriesError, 240)}
+                          </p>
+                        ) : webhookLast === null ? (
+                          <p className="muted" style={{ marginBottom: 0 }}>
+                            no attempts yet
+                          </p>
+                        ) : (
+                          <div className="row-tight" style={{ alignItems: "center", flexWrap: "wrap" }}>
+                            <span className={`chip ${webhookLast.success ? "chip-ok" : "chip-warn"}`}>
+                              {webhookLast.success ? "ok" : "failed"} {webhookLast.status_code ?? "-"}
+                            </span>
+                            <span className="muted mono">{new Date(webhookLast.created_at).toLocaleString()}</span>
+                            {webhookLast.error ? (
+                              <span className="muted mono" title={webhookLast.error}>
+                                {shortError(webhookLast.error, 180)}
+                              </span>
+                            ) : null}
+                          </div>
+                        )}
+                        <div className="row-tight" style={{ marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
+                          <Button
+                            size="s"
+                            view="flat"
+                            disabled={webhookDeliveriesLoading}
+                            onClick={() => void loadWebhookLast(selectedFlow.id)}
+                            data-testid="ops-webhook-refresh"
+                          >
+                            Refresh
+                          </Button>
+                          {canResendWebhook ? (
+                            <Button
+                              size="s"
+                              view="outlined"
+                              disabled={webhookResendRunning}
+                              loading={webhookResendRunning}
+                              onClick={() => void resendWebhook(selectedFlow.id)}
+                              data-testid="ops-webhook-resend"
+                            >
+                              Resend now
+                            </Button>
+                          ) : null}
+                          <Button
+                            size="s"
+                            view="flat"
+                            onClick={() => {
+                              setWebhookAttemptsOpen((v) => !v);
+                              if (!webhookAttemptsOpen) void loadWebhookAttempts(selectedFlow.id);
+                            }}
+                            disabled={webhookDeliveriesLoading}
+                            data-testid="ops-webhook-toggle-attempts"
+                          >
+                            {webhookAttemptsOpen ? "Hide attempts" : "Show attempts"}
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                    {webhookAttemptsOpen && canViewWebhookDeliveries ? (
+                      <div className="list" style={{ marginTop: 8 }}>
+                        {webhookDeliveriesLoading ? <p className="muted">Loading attempts…</p> : null}
+                        {!webhookDeliveriesLoading && webhookDeliveries.length === 0 ? (
+                          <p className="muted">No attempts loaded (open again or refresh).</p>
+                        ) : null}
+                        {webhookDeliveries.map((d) => (
+                          <div
+                            key={d.id}
+                            className="row-tight"
+                            style={{ justifyContent: "space-between", alignItems: "baseline" }}
+                            data-testid="ops-webhook-attempt-row"
+                            data-attempt-no={String(d.attempt_no)}
+                          >
+                            <span className="mono">
+                              {new Date(d.created_at).toLocaleString()} · attempt {d.attempt_no} ·{" "}
+                              {d.success ? "ok" : "failed"} {d.status_code ?? "-"}
+                            </span>
+                            {d.error ? (
+                              <span className="muted mono" style={{ marginLeft: 12 }} title={d.error}>
+                                {shortError(d.error, 160)}
+                              </span>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                 ) : null}
                 {showManualReviewQueue ? (
                   <p>

@@ -26,6 +26,7 @@ from app.models import (
     TopUpRequest,
     WebhookJob,
     WebhookDeadLetter,
+    WebhookDelivery,
     OpsMetricsResponse,
 )
 
@@ -63,6 +64,15 @@ class Repository(Protocol):
         self,
         api_key: str,
         limit: int = 100,
+        status: str | None = None,
+        task_type: str | None = None,
+    ) -> list[TaskWithReview]: ...
+    def list_account_tasks_with_review_after(
+        self,
+        api_key: str,
+        after_updated_at: datetime | None,
+        after_task_id: UUID | None,
+        limit: int = 50,
         status: str | None = None,
         task_type: str | None = None,
     ) -> list[TaskWithReview]: ...
@@ -173,6 +183,7 @@ class Repository(Protocol):
         success: bool,
         error: str | None = None,
     ) -> None: ...
+    def list_webhook_deliveries(self, task_id: UUID, limit: int = 50) -> list[WebhookDelivery]: ...
     def get_openai_interruption(self, interruption_id: str) -> OpenAIInterruptionRecord | None: ...
     def create_openai_interruption(
         self,

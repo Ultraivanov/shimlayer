@@ -26,6 +26,7 @@ run_step "compileall" python3 -m compileall app tests scripts
 if python3 -c "import pytest" >/dev/null 2>&1; then
   run_step "pytest smoke+ops" python3 -m pytest -q tests/test_smoke_flow.py tests/test_ops_admin_controls.py
   run_step "pytest webhooks+stripe" python3 -m pytest -q tests/test_webhook_worker.py tests/test_webhook_dispatcher.py tests/test_stripe_signature.py tests/test_stripe_webhook.py
+  run_step "pytest openai resume worker e2e" python3 -m pytest -q tests/test_openai_resume_worker_e2e.py
 else
   echo "SKIP: pytest module not installed"
 fi

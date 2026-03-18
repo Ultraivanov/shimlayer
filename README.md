@@ -54,6 +54,11 @@ pytest -q
 
 ## One-command checks
 
+## Product map
+
+- End-to-end user journey (Requester → Operator → Ops): `docs/user-journey.md`
+- Requester hybrid integration (push + pull fallback): `docs/requester-hybrid-integration.md`
+
 Fast backend checks (no docker):
 ```bash
 ./scripts/preflight_fast.sh
@@ -114,6 +119,11 @@ Run webhook worker (queue consumer):
 ```bash
 python -m app.workers.webhook_worker
 ```
+
+Pull fallback (recommended hybrid mode):
+- Poll a single task: `GET /v1/tasks/{task_id}`
+- Incremental sync: `GET /v1/tasks/sync` (cursor-based)
+- See `docs/requester-hybrid-integration.md`.
 
 Run Postgres integration test (requires local Postgres on 5432):
 ```bash

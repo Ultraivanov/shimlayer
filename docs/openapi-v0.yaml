@@ -11,6 +11,7 @@ tags:
   - name: Tasks
   - name: Artifacts
   - name: Judgments
+  - name: OpenAI
   - name: Billing
   - name: System
   - name: Ops
@@ -44,6 +45,56 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /v1/tasks/sync:
+    get:
+      tags: [Tasks]
+      summary: Incremental task sync (cursor-based)
+      operationId: syncMyTasks
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Opaque cursor from a previous sync response
+        - name: updated_after
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Bootstrap sync (used only when cursor is not provided)
+        - name: status_filter
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: task_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [stuck_recovery, quick_judgment]
+      responses:
+        "200":
+          description: Sync results returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskSyncResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
   /v1/tasks/{taskId}:
     get:
       tags: [Tasks]
@@ -58,6 +109,51 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TaskWithReview"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/tasks/{taskId}/webhooks/deliveries:
+    get:
+      tags: [Tasks]
+      summary: List webhook delivery attempts for a task (owner only)
+      operationId: listTaskWebhookDeliveries
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 50
+      responses:
+        "200":
+          description: Delivery attempts returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WebhookDelivery"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/tasks/{taskId}/webhooks/last:
+    get:
+      tags: [Tasks]
+      summary: Get last webhook delivery attempt for a task (owner only)
+      operationId: getTaskWebhookLastDelivery
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: Last delivery attempt (or null)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDelivery"
+                nullable: true
         "404":
           $ref: "#/components/responses/NotFound"
 
@@ -256,6 +352,115 @@ paths:
                 $ref: "#/components/schemas/Task"
         "409":
           description: Refund is not allowed for current task state
+
+  /v1/openai/interruptions/ingest:
+    post:
+      tags: [OpenAI]
+      summary: Ingest an OpenAI interruption and create a linked ShimLayer task
+      operationId: ingestOpenAIInterruption
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpenAIInterruptionIngestRequest"
+      responses:
+        "201":
+          description: Interruption record created (or existing returned)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenAIInterruptionRecord"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "402":
+          description: Insufficient flow credits
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /v1/openai/interruptions/{interruption_id}:
+    get:
+      tags: [OpenAI]
+      summary: Get interruption record (owner-only)
+      operationId: getOpenAIInterruption
+      parameters:
+        - name: interruption_id
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 200
+      responses:
+        "200":
+          description: Interruption record returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenAIInterruptionRecord"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/openai/interruptions/{interruption_id}/decision:
+    post:
+      tags: [OpenAI]
+      summary: Record a decision for an interruption and complete the linked task
+      operationId: decideOpenAIInterruption
+      parameters:
+        - name: interruption_id
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 200
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpenAIInterruptionDecisionRequest"
+      responses:
+        "200":
+          description: Updated interruption record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenAIInterruptionRecord"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/openai/interruptions/{interruption_id}/resume:
+    post:
+      tags: [OpenAI]
+      summary: Mark interruption as resumed and return resume payload
+      operationId: resumeOpenAIInterruption
+      parameters:
+        - name: interruption_id
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 200
+      responses:
+        "200":
+          description: Resume payload returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenAIResumeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Decision is not ready (must be decided first)
 
   /v1/judgments:
     post:
@@ -489,6 +694,101 @@ paths:
                   $ref: "#/components/schemas/WebhookDeadLetter"
         "403":
           description: Forbidden
+
+  /v1/ops/webhooks/deliveries:
+    get:
+      tags: [Ops]
+      summary: List webhook delivery attempts for a task (ops)
+      operationId: opsWebhookDeliveries
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+        - name: task_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 300
+      responses:
+        "200":
+          description: Delivery attempts returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WebhookDelivery"
+        "403":
+          description: Forbidden
+
+  /v1/ops/webhooks/last:
+    get:
+      tags: [Ops]
+      summary: Get last webhook delivery attempt for a task (ops)
+      operationId: opsWebhookLastDelivery
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+        - name: task_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Last delivery attempt (or null)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDelivery"
+                nullable: true
+        "403":
+          description: Forbidden
+
+  /v1/ops/webhooks/tasks/{task_id}/resend:
+    post:
+      tags: [Ops]
+      summary: Enqueue a new webhook delivery attempt for a task (ops)
+      operationId: opsWebhookResend
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Resend accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [enqueued]
+                properties:
+                  enqueued:
+                    type: boolean
+                  reason:
+                    type: string
+                    nullable: true
+        "403":
+          description: Forbidden
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /v1/ops/incidents:
     get:
@@ -881,6 +1181,41 @@ paths:
           description: Forbidden
         "404":
           $ref: "#/components/responses/NotFound"
+
+  /v1/ops/flows/download-bulk:
+    post:
+      tags: [Ops]
+      summary: Download multiple flow bundles as a single zip (contains nested flow-<id>.zip files)
+      operationId: opsDownloadFlowBundlesBulk
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [task_ids]
+              properties:
+                task_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        "200":
+          description: Bulk flow bundle zip
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid request
+        "403":
+          description: Forbidden
 
   /v1/ops/flows/{task_id}/artifacts/{artifact_id}/download:
     get:
@@ -1287,6 +1622,33 @@ components:
         task_resolution_p95_seconds:
           type: number
           nullable: true
+
+    WebhookDelivery:
+      type: object
+      required: [id, task_id, callback_url, attempt_no, success, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        task_id:
+          type: string
+          format: uuid
+        callback_url:
+          type: string
+        status_code:
+          type: integer
+          nullable: true
+        attempt_no:
+          type: integer
+          minimum: 1
+        success:
+          type: boolean
+        error:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
 
     WebhookDeadLetter:
       type: object
@@ -1766,3 +2128,147 @@ components:
           format: date-time
         task:
           $ref: "#/components/schemas/Task"
+
+    TaskSyncResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskWithReview"
+        next_cursor:
+          type: string
+          nullable: true
+
+    OpenAIInterruptionIngestRequest:
+      type: object
+      required: [run_id, interruption_id, tool_name, state_blob]
+      properties:
+        run_id:
+          type: string
+          maxLength: 200
+        thread_id:
+          type: string
+          nullable: true
+          maxLength: 200
+        interruption_id:
+          type: string
+          maxLength: 200
+        agent_name:
+          type: string
+          nullable: true
+          maxLength: 120
+        tool_name:
+          type: string
+          maxLength: 200
+        tool_arguments:
+          type: object
+          additionalProperties: true
+        state_blob:
+          type: string
+          description: Opaque state blob from OpenAI interruption payload
+        metadata:
+          type: object
+          additionalProperties: true
+        callback_url:
+          type: string
+          format: uri
+          nullable: true
+        sla_seconds:
+          type: integer
+          minimum: 30
+          maximum: 900
+          default: 120
+
+    OpenAIInterruptionDecisionRequest:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [approve, reject]
+        actor:
+          type: string
+          nullable: true
+          maxLength: 120
+        note:
+          type: string
+          nullable: true
+          maxLength: 1000
+        output:
+          type: object
+          additionalProperties: true
+
+    OpenAIInterruptionRecord:
+      type: object
+      required: [interruption_id, run_id, tool_name, task_id, status, decision_output, context_capsule, metadata, state_blob, created_at]
+      properties:
+        interruption_id:
+          type: string
+        run_id:
+          type: string
+        thread_id:
+          type: string
+          nullable: true
+        agent_name:
+          type: string
+          nullable: true
+        tool_name:
+          type: string
+        task_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, decided, resumed, failed]
+        decision:
+          type: string
+          enum: [approve, reject]
+          nullable: true
+        decision_actor:
+          type: string
+          nullable: true
+        decision_note:
+          type: string
+          nullable: true
+        decision_output:
+          type: object
+          additionalProperties: true
+        context_capsule:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+        state_blob:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        decided_at:
+          type: string
+          format: date-time
+          nullable: true
+        resumed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    OpenAIResumeResponse:
+      type: object
+      required: [interruption_id, run_id, resume_enqueued, resume_payload, resumed_at]
+      properties:
+        interruption_id:
+          type: string
+        run_id:
+          type: string
+        resume_enqueued:
+          type: boolean
+          default: true
+        resume_payload:
+          type: object
+          additionalProperties: true
+        resumed_at:
+          type: string
+          format: date-time

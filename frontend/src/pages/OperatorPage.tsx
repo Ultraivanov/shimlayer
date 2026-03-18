@@ -1,15 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Card, Select, TextInput } from "@gravity-ui/uikit";
+import { Button, Card, Select, TextArea, TextInput } from "@gravity-ui/uikit";
 
 import { Api } from "../api";
 import type { Task, TaskWithReview } from "../types";
 import { ArtifactTile } from "../components/ArtifactTile";
+
+type ToastLevel = "success" | "error";
+type ToastMessage = { id: string; level: ToastLevel; text: string };
 
 function toBase64Utf8(text: string): string {
   const bytes = new TextEncoder().encode(text);
   let binary = "";
   for (const b of bytes) binary += String.fromCharCode(b);
   return btoa(binary);
+}
+
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+  if (target.isContentEditable) return true;
+  if (target.closest("input, textarea, select, [contenteditable='true']")) return true;
+  return false;
+}
+
+function isSha256Hex(value: string): boolean {
+  return /^[0-9a-f]{64}$/i.test(value);
 }
 
 export function OperatorPage() {
@@ -19,7 +35,11 @@ export function OperatorPage() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [taskTypeFilter, setTaskTypeFilter] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [openTaskId, setOpenTaskId] = useState<string>("");
+  const [openTaskBusy, setOpenTaskBusy] = useState<boolean>(false);
+  const [createBusy, setCreateBusy] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isWorking, setIsWorking] = useState(false);
   const [autoRefreshSeconds, setAutoRefreshSeconds] = useState<0 | 15 | 30 | 60>(() => {
     const raw = Number(localStorage.getItem("operator.autoRefreshSeconds") ?? "15");
@@ -32,9 +52,19 @@ export function OperatorPage() {
   const [autoRefreshLastError, setAutoRefreshLastError] = useState<string>("");
   const [nowMs, setNowMs] = useState(() => Date.now());
   const refreshInFlightRef = useRef(false);
+  const [showMoreActions, setShowMoreActions] = useState<boolean>(false);
+
+  const proofFormRef = useRef<HTMLDivElement | null>(null);
+  const [proofArtifactType, setProofArtifactType] = useState<string>("logs");
+  const [proofStoragePath, setProofStoragePath] = useState<string>("");
+  const [proofChecksum, setProofChecksum] = useState<string>("");
+  const [proofMetadataJson, setProofMetadataJson] = useState<string>("{}");
+  const [proofBusy, setProofBusy] = useState<boolean>(false);
+  const [proofAllowMetadataOnly, setProofAllowMetadataOnly] = useState<boolean>(false);
 
   const TASK_STATUSES = ["any", "pending", "queued", "claimed", "completed", "failed", "disputed", "refunded"] as const;
   const TASK_TYPES = ["any", "stuck_recovery", "quick_judgment"] as const;
+  const PROOF_ARTIFACT_TYPES = ["logs", "screenshot", "recording", "other"] as const;
 
   const filteredTasks = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -51,6 +81,27 @@ export function OperatorPage() {
     () => filteredTasks.find((t) => t.id === selectedTaskId) ?? filteredTasks[0],
     [filteredTasks, selectedTaskId]
   );
+
+  function isUuidLike(value: string): boolean {
+    const v = String(value || "").trim();
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+  }
+
+  async function copyText(value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  function pushToast(level: ToastLevel, text: string) {
+    const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    setToasts((prev) => [...prev.slice(-3), { id, level, text }]);
+    window.setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  }
 
   async function refresh() {
     setError(null);
@@ -77,6 +128,43 @@ export function OperatorPage() {
     }
   }
 
+  async function createDemoTask(kind: "stuck_recovery" | "quick_judgment") {
+    if (createBusy) return;
+    setCreateBusy(true);
+    setError(null);
+    try {
+      const payload =
+        kind === "quick_judgment"
+          ? {
+              task_type: "quick_judgment",
+              context: { question: "Approve this automation run?", source: "operator-demo" },
+              sla_seconds: 90,
+              max_price_usd: 0.48,
+              callback_url: null
+            }
+          : {
+              task_type: "stuck_recovery",
+              context: { logs: "Agent loop in checkout", prompt: "retrying forever", source: "operator-demo" },
+              sla_seconds: 180,
+              max_price_usd: 0.48,
+              callback_url: null
+            };
+      const task = await Api.createTask(payload);
+      setTasks((prev) => [task, ...prev]);
+      setSelectedTaskId(task.id);
+      try {
+        const detail = await Api.getTask(task.id);
+        setSelectedTaskDetail(detail);
+      } catch {
+        // ignore
+      }
+    } catch (e) {
+      setError(`Create failed: ${String(e)}`);
+    } finally {
+      setCreateBusy(false);
+    }
+  }
+
   useEffect(() => {
     void refresh();
   }, []);
@@ -95,6 +183,37 @@ export function OperatorPage() {
     const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    // Reduce visual noise: collapse "More" when switching tasks.
+    setShowMoreActions(false);
+  }, [selectedTaskId]);
+
+  async function openById() {
+    const id = openTaskId.trim();
+    if (!id) return;
+    if (!isUuidLike(id)) {
+      setError("Invalid Task ID (expected UUID)");
+      return;
+    }
+    if (openTaskBusy) return;
+    setOpenTaskBusy(true);
+    setError(null);
+    try {
+      const task = await Api.getTask(id);
+      setSelectedTaskId(task.id);
+      setSelectedTaskDetail(task);
+      setTasks((prev) => {
+        const next = [task as unknown as Task, ...prev.filter((t) => t.id !== task.id)];
+        return next;
+      });
+      setOpenTaskId("");
+    } catch (e) {
+      setError(`Open failed: ${String(e)}`);
+    } finally {
+      setOpenTaskBusy(false);
+    }
+  }
 
   function formatDurationShort(ms: number): string {
     const total = Math.max(0, Math.floor(ms / 1000));
@@ -157,8 +276,10 @@ export function OperatorPage() {
       setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
       setSelectedTaskId(updated.id);
       await refresh();
+      pushToast("success", "Task claimed");
     } catch (e) {
       setError(String(e));
+      pushToast("error", `Claim failed: ${String(e)}`);
     } finally {
       setIsWorking(false);
     }
@@ -176,8 +297,10 @@ export function OperatorPage() {
       const updated = await Api.completeTask(selectedTask.id, result, null);
       setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
       await refresh();
+      pushToast("success", "Task completed");
     } catch (e) {
       setError(String(e));
+      pushToast("error", `Complete failed: ${String(e)}`);
     } finally {
       setIsWorking(false);
     }
@@ -197,10 +320,98 @@ export function OperatorPage() {
         metadata: { source: "operator-console" }
       });
       await refresh();
+      pushToast("success", "Local proof uploaded");
     } catch (e) {
       setError(String(e));
+      pushToast("error", `Proof upload failed: ${String(e)}`);
     } finally {
       setIsWorking(false);
+    }
+  }
+
+  function scrollToProofForm() {
+    window.setTimeout(() => proofFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  }
+
+  function prefillProofFromArtifact(artifact: unknown) {
+    const a = artifact as any;
+    const storage = String(a?.storage_path ?? "").trim();
+    if (!storage) return;
+    setProofArtifactType(String(a?.artifact_type ?? "logs") || "logs");
+    setProofStoragePath(storage);
+    setProofChecksum(String(a?.checksum_sha256 ?? ""));
+    setProofAllowMetadataOnly(false);
+    try {
+      const meta = a?.metadata && typeof a.metadata === "object" && !Array.isArray(a.metadata) ? a.metadata : {};
+      setProofMetadataJson(JSON.stringify(meta));
+    } catch {
+      setProofMetadataJson("{}");
+    }
+    scrollToProofForm();
+  }
+
+  function loadProofPreset(kind: "s3" | "gcs" | "http") {
+    if (!selectedTask) return;
+    setProofArtifactType("logs");
+    setProofAllowMetadataOnly(false);
+    const id = selectedTask.id;
+    if (kind === "s3") {
+      setProofStoragePath(`s3://bucket/proofs/${id}/logs.txt`);
+      setProofMetadataJson('{"source":"s3"}');
+    } else if (kind === "gcs") {
+      setProofStoragePath(`gs://bucket/proofs/${id}/logs.txt`);
+      setProofMetadataJson('{"source":"gcs"}');
+    } else {
+      setProofStoragePath(`https://example.com/proofs/${id}/logs.txt`);
+      setProofMetadataJson('{"source":"http"}');
+    }
+    setProofChecksum("");
+    scrollToProofForm();
+  }
+
+  async function registerProofMetadata(): Promise<boolean> {
+    if (!selectedTask) return false;
+    const storage = proofStoragePath.trim();
+    if (!storage) {
+      setError("storage_path is required");
+      return false;
+    }
+    const checksum = proofChecksum.trim();
+    if (checksum && !isSha256Hex(checksum)) {
+      setError("checksum_sha256 must be 64 hex chars");
+      return false;
+    }
+    let meta: Record<string, unknown> = {};
+    try {
+      const rawMeta = proofMetadataJson.trim();
+      const parsed = JSON.parse(rawMeta || "{}");
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) meta = parsed as Record<string, unknown>;
+      else throw new Error("metadata must be a JSON object");
+    } catch (e) {
+      setError(`Invalid metadata JSON: ${String(e)}`);
+      return false;
+    }
+    setProofBusy(true);
+    setError(null);
+    try {
+      await Api.uploadProof(selectedTask.id, {
+        artifact_type: proofArtifactType,
+        storage_path: storage,
+        checksum_sha256: checksum || null,
+        metadata: meta
+      });
+      setProofStoragePath("");
+      setProofChecksum("");
+      setProofMetadataJson("{}");
+      await refresh();
+      pushToast("success", proofWouldBeQuality ? "Proof registered (quality)" : "Proof metadata registered");
+      return true;
+    } catch (e) {
+      setError(String(e));
+      pushToast("error", `Proof register failed: ${String(e)}`);
+      return false;
+    } finally {
+      setProofBusy(false);
     }
   }
 
@@ -213,8 +424,113 @@ export function OperatorPage() {
     });
   }, [selectedTaskDetail]);
 
+  const proofChecksumError = useMemo(() => {
+    const v = proofChecksum.trim();
+    if (!v) return "";
+    return isSha256Hex(v) ? "" : "Invalid sha256: must be 64 hex chars.";
+  }, [proofChecksum]);
+
+  const proofMetadataError = useMemo(() => {
+    const raw = proofMetadataJson.trim();
+    if (!raw) return "";
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return "metadata must be a JSON object";
+      return "";
+    } catch {
+      return "metadata is not valid JSON";
+    }
+  }, [proofMetadataJson]);
+
+  const proofCanSubmit = useMemo(() => {
+    return Boolean(proofStoragePath.trim()) && !proofChecksumError && !proofMetadataError;
+  }, [proofChecksumError, proofMetadataError, proofStoragePath]);
+
+  const proofWouldBeQuality = useMemo(() => {
+    const storage = proofStoragePath.trim();
+    if (!storage) return false;
+    if (storage.startsWith("local:")) return true;
+    const checksum = proofChecksum.trim();
+    return Boolean(checksum) && isSha256Hex(checksum);
+  }, [proofChecksum, proofStoragePath]);
+
+  const proofCanSubmitAsQuality = useMemo(() => {
+    if (!proofCanSubmit) return false;
+    if (proofWouldBeQuality) return true;
+    return proofAllowMetadataOnly;
+  }, [proofAllowMetadataOnly, proofCanSubmit, proofWouldBeQuality]);
+
+  useEffect(() => {
+    if (proofWouldBeQuality && proofAllowMetadataOnly) setProofAllowMetadataOnly(false);
+  }, [proofAllowMetadataOnly, proofWouldBeQuality]);
+
   const reviewStatus = selectedTaskDetail?.review?.review_status ? String(selectedTaskDetail.review.review_status) : "";
   const artifactsCount = (selectedTaskDetail?.artifacts ?? []).length;
+  const isActionable = selectedTask?.status === "queued" || selectedTask?.status === "claimed";
+
+  const hotkeyStateRef = useRef({
+    isWorking: false,
+    filteredTasks: [] as Task[],
+    selectedTaskId: "",
+    selectedTask: null as Task | null,
+    hasQualityProof: false,
+  });
+  useEffect(() => {
+    hotkeyStateRef.current = {
+      isWorking,
+      filteredTasks,
+      selectedTaskId,
+      selectedTask: selectedTask ?? null,
+      hasQualityProof,
+    };
+  }, [filteredTasks, hasQualityProof, isWorking, selectedTask, selectedTaskId]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const s = hotkeyStateRef.current;
+      if (s.isWorking) return;
+      if (isTypingTarget(event.target)) return;
+      if (!s.filteredTasks.length) return;
+
+      const key = event.key.toLowerCase();
+      if (key === "j" || key === "arrowdown") {
+        event.preventDefault();
+        const idx = Math.max(0, s.filteredTasks.findIndex((t) => t.id === s.selectedTaskId));
+        const next = s.filteredTasks[Math.min(s.filteredTasks.length - 1, idx + 1)];
+        if (next) setSelectedTaskId(next.id);
+        return;
+      }
+      if (key === "k" || key === "arrowup") {
+        event.preventDefault();
+        const idx = Math.max(0, s.filteredTasks.findIndex((t) => t.id === s.selectedTaskId));
+        const prev = s.filteredTasks[Math.max(0, idx - 1)];
+        if (prev) setSelectedTaskId(prev.id);
+        return;
+      }
+      if (key === "c") {
+        if (s.selectedTask && s.selectedTask.status === "queued") {
+          event.preventDefault();
+          void claim();
+        }
+        return;
+      }
+      if (key === "p") {
+        if (s.selectedTask && (s.selectedTask.status === "queued" || s.selectedTask.status === "claimed") && !s.hasQualityProof) {
+          event.preventDefault();
+          void addProof();
+        }
+        return;
+      }
+      if (key === "enter" && event.shiftKey) {
+        if (s.selectedTask && (s.selectedTask.status === "queued" || s.selectedTask.status === "claimed") && s.hasQualityProof) {
+          event.preventDefault();
+          void complete();
+        }
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   return (
     <section className="grid two-col">
@@ -251,6 +567,31 @@ export function OperatorPage() {
               Refresh
             </Button>
           </div>
+        </div>
+        <div className="row-tight" style={{ alignItems: "center" }}>
+          <TextInput
+            size="m"
+            value={openTaskId}
+            onUpdate={setOpenTaskId}
+            placeholder="Open by Task ID (UUID)"
+            disabled={openTaskBusy}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void openById();
+              }
+            }}
+          />
+          <Button
+            view="outlined"
+            size="m"
+            disabled={openTaskBusy || !openTaskId.trim()}
+            loading={openTaskBusy}
+            onClick={() => void openById()}
+            data-testid="operator-open-by-id"
+          >
+            Open
+          </Button>
         </div>
         <div className="row-tight">
           <Select
@@ -302,8 +643,11 @@ export function OperatorPage() {
 
       <Card className="panel" view="raised" data-testid="operator-actions">
         <h2>Operator Actions</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Hotkeys: <span className="mono">j/k</span> navigate · <span className="mono">c</span> claim · <span className="mono">p</span> add proof · <span className="mono">Shift+Enter</span> complete
+        </p>
         {!selectedTask ? <p className="muted">Select a task from queue.</p> : null}
-        {selectedTask ? (
+      {selectedTask ? (
           <>
             <p className="muted mono">{selectedTask.id}</p>
             <div className="detail-block" data-testid="operator-task-summary">
@@ -322,6 +666,110 @@ export function OperatorPage() {
               <p>
                 <strong>Proof:</strong> {hasQualityProof ? <span className="mono">present</span> : <span className="muted">missing</span>}
               </p>
+            </div>
+            {!isActionable ? <p className="muted">This task is not actionable (terminal state).</p> : null}
+            {isActionable && !hasQualityProof ? (
+              <p className="muted">
+                Completion requires quality proof. Upload a local file (recommended) or register an external proof with <span className="mono">checksum_sha256</span>.
+              </p>
+            ) : null}
+            <div className="detail-block" ref={proofFormRef} data-testid="operator-proof">
+              <div className="section-head">
+                <p className="muted" style={{ margin: 0 }}>Proof</p>
+                <div className="row-tight">
+                  <Button size="s" view="outlined" disabled={!selectedTask || !isActionable || proofBusy || isWorking} onClick={() => loadProofPreset("s3")}>
+                    S3 preset
+                  </Button>
+                  <Button size="s" view="outlined" disabled={!selectedTask || !isActionable || proofBusy || isWorking} onClick={() => loadProofPreset("gcs")}>
+                    GCS preset
+                  </Button>
+                  <Button size="s" view="outlined" disabled={!selectedTask || !isActionable || proofBusy || isWorking} onClick={() => loadProofPreset("http")}>
+                    HTTP preset
+                  </Button>
+                </div>
+              </div>
+              <div className={`callout ${proofWouldBeQuality ? "callout-ok" : "callout-warn"}`} style={{ marginTop: 8 }}>
+                <p className="muted">
+                  To unblock completion, provide a valid <span className="mono">checksum_sha256</span> (unless <span className="mono">storage_path</span> is <span className="mono">local:</span>).
+                </p>
+              </div>
+              <div className="row-tight" style={{ alignItems: "center" }}>
+                <Select
+                  width="max"
+                  value={[proofArtifactType]}
+                  options={PROOF_ARTIFACT_TYPES.map((t) => ({ value: t, content: `artifact_type: ${t}` }))}
+                  onUpdate={(items) => setProofArtifactType(String(items[0] ?? "logs"))}
+                  disabled={!isActionable || proofBusy}
+                />
+                <TextInput
+                  size="m"
+                  value={proofStoragePath}
+                  onUpdate={setProofStoragePath}
+                  placeholder="storage_path (s3://…, gs://…, https://…)"
+                  disabled={!isActionable || proofBusy}
+                />
+              </div>
+              <div className="row-tight" style={{ alignItems: "center", marginTop: 8 }}>
+                <TextInput
+                  size="m"
+                  value={proofChecksum}
+                  onUpdate={setProofChecksum}
+                  placeholder="checksum_sha256 (required for quality proof unless local:)"
+                  disabled={!isActionable || proofBusy}
+                />
+	                <Button
+	                  size="m"
+	                  view="action"
+	                  disabled={!isActionable || proofBusy || !proofCanSubmitAsQuality}
+	                  loading={proofBusy}
+                    title={
+                      proofBusy
+                        ? "Registering…"
+                        : !isActionable
+                          ? "Task is not actionable"
+                          : !proofStoragePath.trim()
+                            ? "Enter storage_path to register proof"
+                            : proofChecksumError
+                              ? proofChecksumError
+                              : proofMetadataError
+                                ? proofMetadataError
+                                : !proofWouldBeQuality && !proofAllowMetadataOnly
+                                  ? "Add checksum_sha256 (or use local:) to unblock completion"
+                                  : "Register proof"
+                    }
+	                  onClick={() => void registerProofMetadata()}
+	                  data-testid="operator-register-proof"
+	                >
+	                  {proofWouldBeQuality ? "Register proof" : proofAllowMetadataOnly ? "Register metadata (won’t unblock)" : "Add checksum to register"}
+	                </Button>
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <TextArea
+                  value={proofMetadataJson}
+                  onUpdate={setProofMetadataJson}
+                  placeholder="metadata JSON (object)"
+                  minRows={4}
+                  disabled={!isActionable || proofBusy}
+                />
+              </div>
+              {proofChecksumError || proofMetadataError ? (
+                <p className="muted" style={{ marginTop: 6 }}>
+                  {proofChecksumError ? <span className="muted">checksum: {proofChecksumError}</span> : null}
+                  {proofChecksumError && proofMetadataError ? <span className="muted"> · </span> : null}
+                  {proofMetadataError ? <span className="muted">metadata: {proofMetadataError}</span> : null}
+                </p>
+              ) : null}
+              {!proofWouldBeQuality ? (
+                <label className="muted" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={proofAllowMetadataOnly}
+                    onChange={(e) => setProofAllowMetadataOnly(e.currentTarget.checked)}
+                    disabled={proofBusy}
+                  />
+                  Allow metadata-only registration (won’t unblock completion)
+                </label>
+              ) : null}
             </div>
             {selectedTaskDetail?.context ? (
               <div className="detail-block">
@@ -356,6 +804,17 @@ export function OperatorPage() {
                         })
                         .catch((e) => setError(String(e)))
                     }
+                    extraActions={
+                      <Button
+                        size="s"
+                        view="flat"
+                        onClick={() => prefillProofFromArtifact(a)}
+                        title="Use this artifact’s storage_path/checksum/metadata to prefill the proof form"
+                        data-testid="operator-artifact-use-for-proof"
+                      >
+                        Use for proof
+                      </Button>
+                    }
                     notify={(level, message) => {
                       if (level === "error") setError(message);
                     }}
@@ -364,20 +823,92 @@ export function OperatorPage() {
               </div>
             ) : null}
             <div className="row">
-              <Button size="l" view="action" onClick={claim} loading={isWorking} data-testid="operator-claim">
+              <Button
+                size="l"
+                view="action"
+                onClick={claim}
+                disabled={isWorking || selectedTask.status !== "queued"}
+                loading={isWorking}
+                data-testid="operator-claim"
+                title={selectedTask.status !== "queued" ? "Only queued tasks can be claimed" : "Claim selected task"}
+              >
                 Claim
               </Button>
-              <Button size="l" view="normal" onClick={complete} disabled={!hasQualityProof || isWorking} loading={isWorking} data-testid="operator-complete">
+              <Button
+                size="l"
+                view="action"
+                onClick={complete}
+                disabled={!isActionable || !hasQualityProof || isWorking}
+                loading={isWorking}
+                data-testid="operator-complete"
+                title={!hasQualityProof ? "Completion requires quality proof (upload local proof or register proof with checksum)" : "Complete selected task"}
+              >
                 Complete
               </Button>
-              <Button size="l" view="outlined" onClick={addProof} disabled={isWorking || hasQualityProof} loading={isWorking} data-testid="operator-add-proof">
-                Add Proof
+              <Button
+                size="l"
+                view="normal"
+                onClick={addProof}
+                disabled={!isActionable || isWorking || hasQualityProof}
+                loading={isWorking}
+                data-testid="operator-add-proof"
+                title={hasQualityProof ? "Quality proof already present" : "Upload local proof artifact (quality proof)"}
+              >
+                Upload local proof
+              </Button>
+              <Button size="l" view={showMoreActions ? "action" : "outlined"} onClick={() => setShowMoreActions((v) => !v)}>
+                More
               </Button>
             </div>
+            {showMoreActions ? (
+              <div className="row-tight" style={{ marginTop: 8, flexWrap: "wrap" }}>
+                <Button size="m" view="flat" onClick={() => void copyText(selectedTask.id)}>
+                  Copy ID
+                </Button>
+                <Button
+                  size="m"
+                  view="flat"
+                  onClick={() => {
+                    void Api.downloadTaskBundle(selectedTask.id)
+                      .then(({ blob, filename }) => {
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement("a");
+                        link.href = url;
+                        link.download = filename;
+                        document.body.appendChild(link);
+                        link.click();
+                        link.remove();
+                        URL.revokeObjectURL(url);
+                        pushToast("success", "Downloaded task bundle");
+                      })
+                      .catch((e) => {
+                        setError(String(e));
+                        pushToast("error", `Bundle download failed: ${String(e)}`);
+                      });
+                  }}
+                >
+                  Download bundle
+                </Button>
+                <span className="chip chip-muted" title="Local demo tools for testing the Operator flow">demo</span>
+                <Button size="m" view="outlined" disabled={createBusy} loading={createBusy} onClick={() => void createDemoTask("stuck_recovery")}>
+                  Create stuck task
+                </Button>
+                <Button size="m" view="outlined" disabled={createBusy} loading={createBusy} onClick={() => void createDemoTask("quick_judgment")}>
+                  Create judgment task
+                </Button>
+              </div>
+            ) : null}
           </>
         ) : null}
       </Card>
 
+      <div className="toast-stack" aria-live="polite" aria-atomic="false">
+        {toasts.map((toast) => (
+          <div key={toast.id} className={`toast toast-${toast.level}`} role="status">
+            {toast.text}
+          </div>
+        ))}
+      </div>
       {error ? <p className="error span-2">{error}</p> : null}
     </section>
   );

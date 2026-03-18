@@ -54,6 +54,17 @@ export type DeadLetter = {
   created_at: string;
 };
 
+export type WebhookDelivery = {
+  id: string;
+  task_id: string;
+  callback_url: string;
+  status_code: number | null;
+  attempt_no: number;
+  success: boolean;
+  error: string | null;
+  created_at: string;
+};
+
 export type TaskReview = {
   review_status: string;
   manual_verdict: string | null;
@@ -69,6 +80,39 @@ export type TaskReview = {
 export type TaskWithReview = Task & {
   artifacts: Array<Record<string, unknown>>;
   review: TaskReview | null;
+};
+
+export type TaskSyncResponse = {
+  items: TaskWithReview[];
+  next_cursor: string | null;
+};
+
+export type OpenAIInterruptionRecord = {
+  interruption_id: string;
+  run_id: string;
+  thread_id: string | null;
+  agent_name: string | null;
+  tool_name: string;
+  task_id: string;
+  status: "pending" | "decided" | "resumed" | "failed";
+  decision: "approve" | "reject" | null;
+  decision_actor: string | null;
+  decision_note: string | null;
+  decision_output: Record<string, unknown>;
+  context_capsule: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  state_blob: string;
+  created_at: string;
+  decided_at: string | null;
+  resumed_at: string | null;
+};
+
+export type OpenAIResumeResponse = {
+  interruption_id: string;
+  run_id: string;
+  resume_enqueued: boolean;
+  resume_payload: Record<string, unknown>;
+  resumed_at: string;
 };
 
 export type TaskAuditEntry = {

@@ -56,7 +56,7 @@ test.describe("Requester smoke", () => {
     const taskDetailsCard = taskDetails;
     const proofLine = taskDetailsCard.locator(".detail-block p").filter({ hasText: "Proof:" }).first();
     await expect(proofLine).toContainText("present", { timeout: 20_000 });
-    await page.getByRole("button", { name: "Complete" }).click();
+    await taskDetailsCard.getByRole("button", { name: "Complete" }).click();
 
     const statusChip = taskDetailsCard.locator(".detail-block .status").first();
     await expect(statusChip).toContainText("completed", { timeout: 20_000 });

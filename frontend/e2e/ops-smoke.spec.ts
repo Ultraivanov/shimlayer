@@ -73,6 +73,39 @@ async function seedCompletedTask(request: APIRequestContext, suffix: string): Pr
   return taskId;
 }
 
+async function seedCompletedTaskWithCallback(request: APIRequestContext, suffix: string): Promise<string> {
+  await ensurePurchased(request, `e2e-purchase-callback-${suffix}-${Date.now()}`);
+  const created = await request.post(`${API_URL}/v1/tasks`, {
+    headers: apiHeaders(),
+    data: {
+      task_type: "stuck_recovery",
+      context: { logs: `callback-${suffix}` },
+      callback_url: "https://example.invalid/webhook",
+      sla_seconds: 120
+    }
+  });
+  expect(created.ok()).toBeTruthy();
+  const taskId = (await created.json()).id as string;
+
+  const claimed = await request.post(`${API_URL}/v1/tasks/${taskId}/claim`, { headers: apiHeaders() });
+  expect(claimed.ok()).toBeTruthy();
+  const proof = await request.post(`${API_URL}/v1/tasks/${taskId}/proof`, {
+    headers: apiHeaders(),
+    data: {
+      artifact_type: "logs",
+      storage_path: `proofs/${taskId}/logs.txt`,
+      checksum_sha256: "7b3156ba047074d12159752b77f2b74599eaf76b4743a014ba704a82c01bc990"
+    }
+  });
+  expect(proof.ok()).toBeTruthy();
+  const completed = await request.post(`${API_URL}/v1/tasks/${taskId}/complete`, {
+    headers: apiHeaders(),
+    data: { result: { action_summary: "fixed", next_step: "resume" } }
+  });
+  expect(completed.ok()).toBeTruthy();
+  return taskId;
+}
+
 async function seedCompletedTaskWithLocalArtifact(request: APIRequestContext, suffix: string): Promise<{ taskId: string; filename: string }> {
   await ensurePurchased(request, `e2e-purchase-local-${suffix}-${Date.now()}`);
   const created = await request.post(`${API_URL}/v1/tasks`, {
@@ -186,6 +219,7 @@ async function openOps(page: Page) {
     const preserved = window.localStorage.getItem(preserveKey);
     window.localStorage.clear();
     if (preserved !== null) window.localStorage.setItem(preserveKey, preserved);
+    window.localStorage.setItem("ops.manualQueueAutoRefreshSeconds", "0");
   });
   await page.goto("/");
   await page.locator('[data-qa="tab-ops"]').click();
@@ -216,17 +250,91 @@ async function waitForFlowRows(page: Page, minCount = 1) {
 }
 
 test.describe("Ops smoke", () => {
-  test("queue shows seeded flow and opens inspector", async ({ page, request }) => {
-    const taskId = await seedCompletedTask(request, "queue");
+		  test("queue shows seeded flow and opens inspector", async ({ page, request }) => {
+		    const taskId = await seedCompletedTask(request, "queue");
+		    await openOps(page);
+		    await waitForFlowRows(page, 1);
+		    await page.getByPlaceholder("Open by Task ID (UUID)").fill(taskId);
+        await page.locator('[data-testid="ops-open-by-id"]').click();
+
+	    await expect(page.locator('[data-testid="ops-flow-inspector"]')).toBeVisible();
+	    await expect(page.locator('[data-testid="ops-inspector-task-id"]')).toContainText(taskId);
+
+		    const exportCsv = page.waitForEvent("download");
+		    await page.locator('[data-testid="ops-export-csv"]').click();
+		    const csv = await exportCsv;
+		    expect(csv.suggestedFilename()).toMatch(/^ops-flows-.*\.csv$/);
+		  });
+
+  test("webhook delivery status renders and resend updates view", async ({ page, request }) => {
+    const taskId = await seedCompletedTaskWithCallback(request, "webhook");
+
+    let lastDelivery: any = null;
+    let deliveries = [
+      {
+        id: "11111111-1111-4111-8111-111111111111",
+        task_id: taskId,
+        callback_url: "https://example.invalid/webhook",
+        status_code: 502,
+        attempt_no: 1,
+        success: false,
+        error: "bad gateway",
+        created_at: new Date().toISOString()
+      }
+    ];
+    lastDelivery = deliveries[0];
+
+    await page.route("**/v1/ops/webhooks/last?*", async (route) => {
+      const url = new URL(route.request().url());
+      const requested = url.searchParams.get("task_id");
+      if (requested !== taskId) return route.fallback();
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(lastDelivery) });
+    });
+
+    await page.route("**/v1/ops/webhooks/deliveries?*", async (route) => {
+      const url = new URL(route.request().url());
+      const requested = url.searchParams.get("task_id");
+      if (requested !== taskId) return route.fallback();
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(deliveries) });
+    });
+
+    await page.route(`**/v1/ops/webhooks/tasks/${taskId}/resend`, async (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      deliveries = [
+        {
+          id: "22222222-2222-4222-8222-222222222222",
+          task_id: taskId,
+          callback_url: "https://example.invalid/webhook",
+          status_code: 200,
+          attempt_no: 2,
+          success: true,
+          error: null,
+          created_at: new Date().toISOString()
+        },
+        ...deliveries
+      ];
+      lastDelivery = deliveries[0];
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ enqueued: true }) });
+    });
+
     await openOps(page);
     await waitForFlowRows(page, 1);
+    await page.getByPlaceholder("Search task/account/type/status").fill(taskId);
 
     const targetRow = page.locator(`[data-testid="ops-flow-row"][data-task-id="${taskId}"]`);
     await expect(targetRow).toBeVisible({ timeout: 20_000 });
     await targetRow.click();
 
-    await expect(page.locator('[data-testid="ops-flow-inspector"]')).toBeVisible();
-    await expect(page.locator('[data-testid="ops-inspector-task-id"]')).toContainText(taskId);
+    await expect(page.locator('[data-testid="ops-webhook-last"]')).toContainText("failed");
+
+    // Show attempts (explicit UI check)
+    await page.locator('[data-testid="ops-webhook-toggle-attempts"]').click();
+    await expect
+      .poll(async () => page.locator('[data-testid="ops-webhook-attempt-row"]').count(), { timeout: 20_000 })
+      .toBeGreaterThanOrEqual(1);
+
+    await page.getByRole("button", { name: "Resend now" }).click();
+    await expect(page.locator('[data-testid="ops-webhook-last"]')).toContainText("ok");
   });
 
   test("download flow bundle and local artifact via UI", async ({ page, request }) => {
@@ -251,6 +359,80 @@ test.describe("Ops smoke", () => {
     await page.locator('[data-testid="artifact-download"]').first().click();
     const artifact = await artifactDownload;
     expect(artifact.suggestedFilename()).toBe(seeded.filename);
+  });
+
+  test("bulk download selected flow bundles", async ({ page, request }) => {
+    const taskA = await seedCompletedTask(request, "bulk-download-a");
+    const taskB = await seedCompletedTask(request, "bulk-download-b");
+    await openOps(page);
+    await waitForFlowRows(page, 2);
+
+    // Ensure inspector/action-center is mounted with a selected flow.
+    await page.getByPlaceholder("Open by Task ID (UUID)").fill(taskA);
+    await page.locator('[data-testid="ops-open-by-id"]').click();
+    await expect(page.locator('[data-testid="ops-flow-inspector"]')).toBeVisible();
+    await expect(page.locator('[data-testid="ops-inspector-task-id"]')).toContainText(taskA);
+
+    const bulkDlBtn = page.locator('[data-testid="ops-download-selected-bundles"]');
+    await expect(bulkDlBtn).toBeVisible();
+    await expect(bulkDlBtn).toBeDisabled();
+
+    // Select 2 flows
+    const rowA = page.locator(`[data-testid="ops-flow-row"][data-task-id="${taskA}"]`);
+    const rowB = page.locator(`[data-testid="ops-flow-row"][data-task-id="${taskB}"]`);
+    await expect(rowA).toBeVisible({ timeout: 20_000 });
+    await expect(rowB).toBeVisible({ timeout: 20_000 });
+    await rowA.locator('input[type="checkbox"]').first().check();
+    await rowB.locator('input[type="checkbox"]').first().check();
+    await expect(rowA.locator('input[type="checkbox"]').first()).toBeChecked();
+    await expect(rowB.locator('input[type="checkbox"]').first()).toBeChecked();
+    await expect(page.locator('[data-testid="ops-selected-count"]')).toContainText("Selected: 2");
+
+    await expect(bulkDlBtn).toBeEnabled();
+
+    const downloads: { suggestedFilename(): string }[] = [];
+    const onDownload = (dl: { suggestedFilename(): string }) => downloads.push(dl);
+    page.on("download", onDownload);
+    try {
+      await bulkDlBtn.click();
+      await expect.poll(() => downloads.length, { timeout: 20_000 }).toBe(2);
+    } finally {
+      page.off("download", onDownload);
+    }
+    const names = downloads.map((d) => d.suggestedFilename()).sort();
+    const expected = [`flow-${taskA}.zip`, `flow-${taskB}.zip`].sort();
+    expect(names).toEqual(expected);
+  });
+
+  test("bulk download selected flow bundles as one zip", async ({ page, request }) => {
+    const taskA = await seedCompletedTask(request, "bulk-zip-a");
+    const taskB = await seedCompletedTask(request, "bulk-zip-b");
+    await openOps(page);
+    await waitForFlowRows(page, 2);
+
+    // Ensure inspector/action-center is mounted with a selected flow.
+    await page.getByPlaceholder("Open by Task ID (UUID)").fill(taskA);
+    await page.locator('[data-testid="ops-open-by-id"]').click();
+    await expect(page.locator('[data-testid="ops-flow-inspector"]')).toBeVisible();
+    await expect(page.locator('[data-testid="ops-inspector-task-id"]')).toContainText(taskA);
+
+    const zipBtn = page.locator('[data-testid="ops-download-selected-bundles-zip"]');
+    await expect(zipBtn).toBeVisible();
+    await expect(zipBtn).toBeDisabled();
+
+    const rowA = page.locator(`[data-testid="ops-flow-row"][data-task-id="${taskA}"]`);
+    const rowB = page.locator(`[data-testid="ops-flow-row"][data-task-id="${taskB}"]`);
+    await expect(rowA).toBeVisible({ timeout: 20_000 });
+    await expect(rowB).toBeVisible({ timeout: 20_000 });
+    await rowA.locator('input[type="checkbox"]').first().check();
+    await rowB.locator('input[type="checkbox"]').first().check();
+    await expect(page.locator('[data-testid="ops-selected-count"]')).toContainText("Selected: 2");
+
+    await expect(zipBtn).toBeEnabled();
+    const dlPromise = page.waitForEvent("download");
+    await zipBtn.click();
+    const dl = await dlPromise;
+    expect(dl.suggestedFilename()).toBe("flows-selected.zip");
   });
 
   test("single force-status action works via confirm dialog", async ({ page, request }) => {

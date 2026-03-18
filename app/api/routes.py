@@ -12,6 +12,7 @@ import httpx
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, Response, UploadFile, status
 from fastapi.responses import PlainTextResponse
 from pydantic import ValidationError
+from pydantic import BaseModel
 
 from app.config import get_settings
 from app.domain.enums import ArtifactType, TaskType
@@ -52,9 +53,11 @@ from app.models import (
     Task,
     TaskUpdatedEvent,
     TaskWithReview,
+    TaskSyncResponse,
     TopUpRequest,
     UpdateOpsIncidentRequest,
     WebhookDeadLetter,
+    WebhookDelivery,
     LedgerEntry,
 )
 from app.repositories import get_repo
@@ -411,6 +414,24 @@ def require_admin_context(
     return AdminContext(role=x_admin_role, user_id=x_admin_user)
 
 
+class _TaskSyncCursor(BaseModel):
+    updated_at: datetime
+    task_id: UUID
+
+
+def _encode_task_sync_cursor(updated_at: datetime, task_id: UUID) -> str:
+    raw = _TaskSyncCursor(updated_at=updated_at, task_id=task_id).model_dump(mode="json")
+    data = json.dumps(raw, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    return base64.urlsafe_b64encode(data).decode("utf-8").rstrip("=")
+
+
+def _decode_task_sync_cursor(cursor: str) -> _TaskSyncCursor:
+    pad = "=" * ((4 - (len(cursor) % 4)) % 4)
+    data = base64.urlsafe_b64decode((cursor + pad).encode("utf-8"))
+    obj = json.loads(data.decode("utf-8"))
+    return _TaskSyncCursor(**obj)
+
+
 @router.post("/tasks", response_model=Task, status_code=status.HTTP_201_CREATED)
 def create_task(
     payload: CreateTaskRequest,
@@ -444,6 +465,42 @@ def list_my_tasks(
     )
 
 
+@router.get("/tasks/sync", response_model=TaskSyncResponse)
+def sync_my_tasks(
+    limit: int = 50,
+    cursor: str | None = None,
+    updated_after: datetime | None = None,
+    status_filter: str | None = None,
+    task_type: str | None = None,
+    api_key: str = Depends(require_api_key),
+    repo: Repository = Depends(get_repo),
+) -> TaskSyncResponse:
+    capped_limit = max(1, min(limit, 200))
+    after_updated_at: datetime | None = None
+    after_task_id: UUID | None = None
+    if cursor:
+        try:
+            decoded = _decode_task_sync_cursor(cursor)
+            after_updated_at = decoded.updated_at
+            after_task_id = decoded.task_id
+        except Exception as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid cursor: {exc}") from exc
+    elif updated_after:
+        after_updated_at = updated_after
+        after_task_id = UUID(int=0)
+
+    items = repo.list_account_tasks_with_review_after(
+        api_key=api_key,
+        after_updated_at=after_updated_at,
+        after_task_id=after_task_id,
+        limit=capped_limit,
+        status=status_filter,
+        task_type=task_type,
+    )
+    next_cursor = _encode_task_sync_cursor(items[-1].updated_at, items[-1].id) if items else None
+    return TaskSyncResponse(items=items, next_cursor=next_cursor)
+
+
 @router.get("/tasks/{task_id}", response_model=TaskWithReview)
 def get_task(
     task_id: UUID,
@@ -451,6 +508,29 @@ def get_task(
     repo: Repository = Depends(get_repo),
 ) -> TaskWithReview:
     return _require_owned_task(task_id, api_key, repo)
+
+
+@router.get("/tasks/{task_id}/webhooks/deliveries", response_model=list[WebhookDelivery])
+def my_task_webhook_deliveries(
+    task_id: UUID,
+    limit: int = 20,
+    api_key: str = Depends(require_api_key),
+    repo: Repository = Depends(get_repo),
+) -> list[WebhookDelivery]:
+    _ = _require_owned_task(task_id, api_key, repo)
+    capped_limit = max(1, min(limit, 50))
+    return repo.list_webhook_deliveries(task_id=task_id, limit=capped_limit)
+
+
+@router.get("/tasks/{task_id}/webhooks/last", response_model=WebhookDelivery | None)
+def my_task_webhook_last_delivery(
+    task_id: UUID,
+    api_key: str = Depends(require_api_key),
+    repo: Repository = Depends(get_repo),
+) -> WebhookDelivery | None:
+    _ = _require_owned_task(task_id, api_key, repo)
+    rows = repo.list_webhook_deliveries(task_id=task_id, limit=1)
+    return rows[0] if rows else None
 
 
 @router.get("/tasks/{task_id}/download")
@@ -1094,6 +1174,63 @@ def ops_dead_letters(
     return repo.list_webhook_dead_letters(limit=limit)
 
 
+@router.get("/ops/webhooks/deliveries", response_model=list[WebhookDelivery])
+def ops_webhook_deliveries(
+    task_id: UUID,
+    limit: int = 50,
+    api_key: str = Depends(require_api_key),
+    admin_key: str = Depends(require_admin_key),
+    admin_ctx: AdminContext = Depends(require_admin_context),
+    repo: Repository = Depends(get_repo),
+) -> list[WebhookDelivery]:
+    _ = (api_key, admin_key)
+    if admin_ctx.role not in ("ops_agent", "ops_manager", "admin"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Role is not allowed to view webhook deliveries")
+    return repo.list_webhook_deliveries(task_id=task_id, limit=limit)
+
+
+@router.get("/ops/webhooks/last", response_model=WebhookDelivery | None)
+def ops_webhook_last_delivery(
+    task_id: UUID,
+    api_key: str = Depends(require_api_key),
+    admin_key: str = Depends(require_admin_key),
+    admin_ctx: AdminContext = Depends(require_admin_context),
+    repo: Repository = Depends(get_repo),
+) -> WebhookDelivery | None:
+    _ = (api_key, admin_key)
+    if admin_ctx.role not in ("ops_agent", "ops_manager", "admin"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Role is not allowed to view webhook deliveries")
+    rows = repo.list_webhook_deliveries(task_id=task_id, limit=1)
+    return rows[0] if rows else None
+
+
+@router.post("/ops/webhooks/tasks/{task_id}/resend")
+def ops_webhook_resend(
+    task_id: UUID,
+    api_key: str = Depends(require_api_key),
+    admin_key: str = Depends(require_admin_key),
+    admin_ctx: AdminContext = Depends(require_admin_context),
+    repo: Repository = Depends(get_repo),
+) -> dict:
+    _ = (api_key, admin_key)
+    if admin_ctx.role not in ("ops_agent", "ops_manager", "admin"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Role is not allowed to resend webhooks")
+    task = repo.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+    if not task.callback_url:
+        return {"enqueued": False, "reason": "no callback_url"}
+    repo.enqueue_task_webhook(task, settings.shimlayer_webhook_max_attempts)
+    repo.append_task_audit(
+        task_id=task_id,
+        actor=f"ops:{admin_ctx.user_id}",
+        action="webhook_resend",
+        note="Webhook resend requested",
+        metadata={"callback_url": task.callback_url},
+    )
+    return {"enqueued": True}
+
+
 @router.get("/ops/incidents", response_model=list[OpsIncident])
 def ops_incidents(
     status_filter: str | None = None,
@@ -1491,6 +1628,57 @@ def ops_download_flow_bundle(
     payload = buf.getvalue()
     headers = {"Content-Disposition": f'attachment; filename="flow-{task_id}.zip"'}
     return Response(content=payload, media_type="application/zip", headers=headers)
+
+
+class _OpsBulkDownloadRequest(BaseModel):
+    task_ids: list[UUID]
+
+
+@router.post("/ops/flows/download-bulk")
+def ops_download_flow_bundles_bulk(
+    payload: _OpsBulkDownloadRequest,
+    api_key: str = Depends(require_api_key),
+    admin_key: str = Depends(require_admin_key),
+    admin_ctx: AdminContext = Depends(require_admin_context),
+    repo: Repository = Depends(get_repo),
+) -> Response:
+    _ = (api_key, admin_key)
+    _ensure_role_permission(admin_ctx.role, "download_bundle")
+    task_ids = list(dict.fromkeys(payload.task_ids))
+    if not task_ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="task_ids is required")
+    if len(task_ids) > 200:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many task_ids (max 200)")
+
+    buf = io.BytesIO()
+    manifest: dict = {
+        "generated_at": datetime.now(tz=timezone.utc).isoformat(),
+        "count": len(task_ids),
+        "flows": [],
+    }
+    with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for task_id in task_ids:
+            task = repo.get_task(task_id)
+            if not task:
+                manifest["flows"].append({"task_id": str(task_id), "included": False, "error": "Task not found"})
+                continue
+
+            # Reuse the single-flow bundle logic by embedding each flow bundle as its own zip file.
+            try:
+                flow_payload = ops_download_flow_bundle(task_id=task_id, api_key=api_key, admin_key=admin_key, admin_ctx=admin_ctx, repo=repo).body
+                if flow_payload is None:
+                    raise RuntimeError("Empty response body")
+                zip_name = f"flows/flow-{task_id}.zip"
+                zf.writestr(zip_name, flow_payload)
+                manifest["flows"].append({"task_id": str(task_id), "included": True, "zip_path": zip_name})
+            except Exception as exc:
+                manifest["flows"].append({"task_id": str(task_id), "included": False, "error": str(exc)})
+
+        zf.writestr("manifest.json", json.dumps(manifest, indent=2, default=str))
+
+    payload_bytes = buf.getvalue()
+    headers = {"Content-Disposition": 'attachment; filename="flows-selected.zip"'}
+    return Response(content=payload_bytes, media_type="application/zip", headers=headers)
 
 
 @router.get("/ops/flows/{task_id}/artifacts/{artifact_id}/download")

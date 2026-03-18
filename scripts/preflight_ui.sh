@@ -21,17 +21,6 @@ run_step() {
   return "$rc"
 }
 
-can_bind_localhost() {
-  python3 - <<'PY' >/dev/null 2>&1
-import socket
-s = socket.socket()
-try:
-    s.bind(("127.0.0.1", 0))
-finally:
-    s.close()
-PY
-}
-
 if ! command -v npm >/dev/null 2>&1; then
   echo "FAIL: npm not found"
   exit 1
@@ -44,10 +33,27 @@ export PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-${FRONTEND_DIR}/.pl
 run_step "frontend deps install" npm --prefix "$FRONTEND_DIR" install
 run_step "frontend build" npm --prefix "$FRONTEND_DIR" run build
 run_step "playwright browser install" npm --prefix "$FRONTEND_DIR" run e2e:install
-if can_bind_localhost; then
-  run_step "playwright ops smoke" npm --prefix "$FRONTEND_DIR" run e2e
+echo "==> playwright ops smoke"
+set +e
+pw_out="$(
+  npm --prefix "$FRONTEND_DIR" run e2e -- ops-smoke.spec.ts requester-smoke.spec.ts operator-smoke.spec.ts openai-interruptions.spec.ts 2>&1
+)"
+pw_rc="$?"
+set -e
+if [[ "$pw_rc" -eq 0 ]]; then
+  echo "$pw_out"
+  echo "PASS: playwright ops smoke"
 else
-  echo "SKIP: playwright ops smoke (cannot bind localhost in this environment)"
+  # Some sandboxed environments block localhost binds for child processes.
+  # If so, treat Playwright as skipped rather than failed.
+  if echo "$pw_out" | grep -qiE "attempting to bind.*127\\.0\\.0\\.1.*8000.*operation not permitted"; then
+    echo "$pw_out"
+    echo "SKIP: playwright ops smoke (localhost bind not permitted in this environment)"
+  else
+    echo "$pw_out"
+    echo "FAIL: playwright ops smoke"
+    failures=$((failures + 1))
+  fi
 fi
 
 if [[ "$failures" -gt 0 ]]; then
