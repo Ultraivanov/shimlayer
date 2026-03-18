@@ -1042,7 +1042,7 @@ export function OperatorPage() {
                   <TextArea
                     value={proofMetadataJson}
                     onUpdate={setProofMetadataJson}
-                    placeholder="metadata JSON (object)"
+                    placeholder="metadata JSON (optional)"
                     minRows={4}
                     disabled={!isActionable || proofBusy}
                   />

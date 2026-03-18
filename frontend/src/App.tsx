@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@gravity-ui/uikit";
 
 import { config, getAdminUser } from "./api";
+import { LeadPage } from "./pages/LeadPage";
 import { OperatorPage } from "./pages/OperatorPage";
 import { OpsPage } from "./pages/OpsPage";
 import { RequesterPage } from "./pages/RequesterPage";
@@ -10,6 +11,9 @@ import type { Task } from "./types";
 type Tab = "requester" | "operator" | "ops";
 
 export default function App() {
+  if (typeof window !== "undefined" && window.location.pathname.startsWith("/lead")) {
+    return <LeadPage />;
+  }
   const [tab, setTab] = useState<Tab>("requester");
   const [, setTasks] = useState<Task[]>([]);
 

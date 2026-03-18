@@ -1771,7 +1771,7 @@ export function RequesterPage({ pushTask }: Props) {
 	                  <h4 style={{ margin: "0 0 6px 0" }}>Link external proof</h4>
                     <div className={`callout ${proofWouldBeQuality ? "callout-ok" : "callout-warn"}`} style={{ marginBottom: 8 }}>
                       <p className="muted">
-                        ShimLayer stores a reference (it does not fetch the file). To unblock completion, provide a valid <span className="mono">checksum_sha256</span> (unless <span className="mono">storage_path</span> is <span className="mono">local:</span>).
+                        ShimLayer stores a reference only; it does not fetch the file. To unblock completion, provide a valid <span className="mono">checksum_sha256</span> (unless <span className="mono">storage_path</span> is <span className="mono">local:</span>).
                       </p>
                     </div>
 	                  <div className="row-tight" style={{ alignItems: "center" }}>
@@ -1858,7 +1858,7 @@ export function RequesterPage({ pushTask }: Props) {
                           <TextArea
                             value={proofMetadataJson}
                             onUpdate={setProofMetadataJson}
-                            placeholder='metadata JSON (e.g. {"source":"s3"})'
+                            placeholder='metadata JSON (optional, e.g. {"source":"s3"})'
                             disabled={proofBusy}
                             minRows={4}
                           />

@@ -53,3 +53,6 @@ Use this checklist before onboarding external alpha customers.
 ## 6. One-command Validation
 - Run `./scripts/alpha_readiness_check.sh`.
 - Result must be `Alpha readiness PASSED.`
+Note: for release, enforce strict gates:
+- `SHIMLAYER_STRICT_UI_SMOKE=1 ./scripts/preflight_ui.sh`
+- `SHIMLAYER_STRICT_DOCKER=1 ./scripts/preflight_local.sh`

@@ -1,0 +1,148 @@
+.lead-root {
+  min-height: 100vh;
+  padding: 48px 24px 96px;
+  background: radial-gradient(1000px 600px at 10% -10%, rgba(124, 243, 199, 0.18), transparent),
+              radial-gradient(900px 500px at 100% 0%, rgba(138, 180, 255, 0.2), transparent),
+              #0f1115;
+  color: #eef2f7;
+}
+
+.lead-hero {
+  max-width: 1100px;
+  margin: 0 auto 40px;
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 32px;
+  align-items: center;
+}
+
+.lead-hero-copy h1 {
+  font-size: 44px;
+  line-height: 1.05;
+  margin: 12px 0 12px;
+}
+
+.lead-subtitle {
+  color: #a5b0c3;
+  font-size: 16px;
+}
+
+.lead-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  background: rgba(124, 243, 199, 0.12);
+  border: 1px solid rgba(124, 243, 199, 0.4);
+  border-radius: 999px;
+  font-size: 12px;
+  color: #7cf3c7;
+}
+
+.lead-cta-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 18px 0 10px;
+}
+
+.lead-trust {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #9aa4b2;
+}
+
+.lead-hero-card {
+  background: #151a23;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.lead-hero-card h3 {
+  margin-top: 0;
+}
+
+.lead-hero-card ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #c7d0de;
+}
+
+.lead-grid {
+  max-width: 1100px;
+  margin: 0 auto 40px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+
+.lead-metric {
+  background: #151a23;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.lead-flow {
+  max-width: 1100px;
+  margin: 0 auto 40px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+}
+
+.lead-flow-card {
+  background: #151a23;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.lead-flow-card h3 {
+  margin-top: 0;
+}
+
+.lead-flow-card ol,
+.lead-flow-card ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #c7d0de;
+}
+
+.lead-form {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.lead-form-card {
+  background: #151a23;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.lead-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.lead-form-wide {
+  grid-column: 1 / -1;
+}
+
+.lead-form-actions {
+  margin-top: 16px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 980px) {
+  .lead-hero,
+  .lead-grid,
+  .lead-flow {
+    grid-template-columns: 1fr;
+  }
+  .lead-hero-copy h1 {
+    font-size: 36px;
+  }
+  .lead-form-grid {
+    grid-template-columns: 1fr;
+  }
+}

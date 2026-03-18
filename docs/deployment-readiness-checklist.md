@@ -1,5 +1,7 @@
 # Deployment Readiness Checklist
 
+Use this checklist alongside the report template in `docs/deployment-readiness-report-template.md`.
+
 ## Environment
 - `SHIMLAYER_REPOSITORY` set (`postgres` for production).
 - `SHIMLAYER_DB_DSN` points to reachable DB.
@@ -109,4 +111,5 @@ Verify:
 ```bash
 SHIMLAYER_STRICT_UI_SMOKE=1 ./scripts/preflight_ui.sh
 SHIMLAYER_STRICT_DOCKER=1 ./scripts/preflight_local.sh
+./scripts/preflight_strict.sh
 ```

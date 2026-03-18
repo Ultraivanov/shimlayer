@@ -5,6 +5,7 @@ import "@gravity-ui/uikit/styles/fonts.css";
 import "@gravity-ui/uikit/styles/styles.css";
 import App from "./App";
 import "./styles.css";
+import "./styles/lead.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

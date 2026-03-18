@@ -1,6 +1,7 @@
 # Deploy Runbook (v0)
 
 This is a practical checklist for deploying ShimLayer as an API + background workers backed by Postgres.
+For specialist handoff and strict gates, also read `docs/deploy-handoff-pack.md`.
 
 ## 0) Choose a target
 
@@ -34,6 +35,8 @@ Recommended:
 - `SHIMLAYER_RETENTION_WEBHOOK_DELIVERIES_DAYS=30`
 - `SHIMLAYER_RETENTION_SUCCEEDED_JOBS_DAYS=7`
 - `SHIMLAYER_RETENTION_API_RATE_WINDOWS_HOURS=48`
+Security posture:
+- See `docs/security-notes.md` (UI key exposure + admin header requirements).
 
 ## 3) Build + run
 
@@ -56,4 +59,3 @@ Run:
 - `./scripts/preflight_fast.sh`
 - `./scripts/preflight_ui.sh` (in an environment that allows localhost binds for Playwright webServer)
 - `./scripts/preflight_all.sh --with-docker` (in a runner with Docker daemon, if you validate compose locally)
-

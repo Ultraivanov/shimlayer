@@ -4,6 +4,7 @@
 - Ensure Python, npm, and Docker are installed.
 - Ensure required env vars are set (`SHIMLAYER_*`, `VITE_*`).
 - Ensure admin headers are configured for Ops/API checks.
+ - Review `docs/security-notes.md`.
 
 ## 2. Fast code health
 ```bash
@@ -25,6 +26,7 @@ Tip: enforce this in CI by running `SHIMLAYER_STRICT_UI_SMOKE=1 ./scripts/prefli
 ```
 Expected: all internal steps pass.
 Tip: enforce Docker availability by running `SHIMLAYER_STRICT_DOCKER=1 ./scripts/preflight_local.sh`.
+Tip: for a single strict gate, run `./scripts/preflight_strict.sh`.
 
 ## 5. API readiness + observability probes
 ```bash

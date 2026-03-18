@@ -63,6 +63,11 @@ pytest -q
 - Deploy runbook: `docs/deploy-runbook-v0.md`
 - Deploy handoff (for specialist): `docs/deploy-handoff.md`
 - Security notes: `docs/security-notes.md`
+- Deployment readiness report template: `docs/deployment-readiness-report-template.md`
+- Pre-deploy one-pager: `docs/pre-deploy-onepager.md`
+- Deployment readiness report example: `docs/deployment-readiness-report-example.md`
+- Deploy handoff pack (read order): `docs/deploy-handoff-pack.md`
+- Lead capture landing (Gravity UI): `frontend/src/pages/LeadPage.tsx` (served at `/lead`)
 
 Fast backend checks (no docker):
 ```bash
@@ -81,6 +86,9 @@ Unified preflight:
 
 # fast + ui + docker/postgres integration
 ./scripts/preflight_all.sh --with-docker
+
+# strict (fails on any SKIP, requires docker + localhost binds)
+./scripts/preflight_strict.sh
 ```
 
 CI automation:

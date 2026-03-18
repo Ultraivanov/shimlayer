@@ -78,4 +78,4 @@ Ops:
 
 - If the browser UI is deployed publicly, **do not ship real admin keys** into `VITE_*` variables (they become public in JS). Keep the UI internal or introduce a proper auth gateway.
 - Startup warnings like `startup_security_warning` must not appear in production logs (rotate secrets).
-
+See `docs/security-notes.md` for the minimum security posture.

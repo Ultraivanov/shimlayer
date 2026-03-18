@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1400" height="900" viewBox="0 0 1400 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1400" height="900" fill="#0F1115"/>
+  <ellipse cx="240" cy="40" rx="420" ry="220" fill="#1A3A2E" opacity="0.45"/>
+  <ellipse cx="1280" cy="60" rx="360" ry="200" fill="#1C2842" opacity="0.5"/>
+
+  <rect x="70" y="60" width="1260" height="780" rx="28" fill="#121826" stroke="#2A3240"/>
+
+  <rect x="120" y="110" width="190" height="34" rx="17" fill="#16362E" stroke="#2A7F64"/>
+  <text x="138" y="132" font-family="Arial" font-size="13" fill="#7CF3C7">Early access whitelist</text>
+
+  <text x="120" y="210" font-family="Arial" font-size="44" fill="#F2F4F8">Recover agent failures</text>
+  <text x="120" y="258" font-family="Arial" font-size="44" fill="#F2F4F8">in minutes, not days.</text>
+  <text x="120" y="304" font-family="Arial" font-size="16" fill="#A5B0C3">ShimLayer turns OpenAI interruptions into structured human decisions</text>
+  <text x="120" y="326" font-family="Arial" font-size="16" fill="#A5B0C3">with proof, audits, and reliable delivery.</text>
+
+  <rect x="120" y="360" width="190" height="48" rx="12" fill="#7CF3C7"/>
+  <text x="140" y="391" font-family="Arial" font-size="16" fill="#0D1117">Join whitelist</text>
+  <rect x="320" y="360" width="170" height="48" rx="12" fill="none" stroke="#2A3240"/>
+  <text x="345" y="391" font-family="Arial" font-size="16" fill="#E6EAF2">See how it works</text>
+
+  <rect x="120" y="430" width="460" height="110" rx="16" fill="#151A23" stroke="#2A3240"/>
+  <text x="140" y="462" font-family="Arial" font-size="14" fill="#9AA4B2">Decision SLAs • Proof artifacts • Audit trail • Manual review controls</text>
+
+  <rect x="720" y="160" width="550" height="320" rx="22" fill="#151A23" stroke="#2A3240"/>
+  <text x="750" y="200" font-family="Arial" font-size="18" fill="#F2F4F8">What you get</text>
+  <rect x="750" y="220" width="500" height="40" rx="12" fill="#1C2431" stroke="#2A3240"/>
+  <rect x="750" y="270" width="500" height="40" rx="12" fill="#1C2431" stroke="#2A3240"/>
+  <rect x="750" y="320" width="500" height="40" rx="12" fill="#1C2431" stroke="#2A3240"/>
+  <rect x="750" y="370" width="500" height="40" rx="12" fill="#1C2431" stroke="#2A3240"/>
+  <text x="766" y="245" font-family="Arial" font-size="13" fill="#E6EAF2">Approve/reject interruptions with clear accountability</text>
+  <text x="766" y="295" font-family="Arial" font-size="13" fill="#E6EAF2">Attach proof artifacts and operator notes</text>
+  <text x="766" y="345" font-family="Arial" font-size="13" fill="#E6EAF2">Push + pull delivery for reliability</text>
+  <text x="766" y="395" font-family="Arial" font-size="13" fill="#E6EAF2">Ops visibility: queues, locks, audits</text>
+
+  <rect x="120" y="560" width="1240" height="250" rx="22" fill="#151A23" stroke="#2A3240"/>
+  <text x="140" y="600" font-family="Arial" font-size="20" fill="#F2F4F8">Join the whitelist</text>
+  <text x="140" y="625" font-family="Arial" font-size="14" fill="#9AA4B2">We reply within 2 business days.</text>
+
+  <rect x="140" y="650" width="360" height="44" rx="10" fill="#0F131A" stroke="#2A3240"/>
+  <rect x="520" y="650" width="360" height="44" rx="10" fill="#0F131A" stroke="#2A3240"/>
+  <rect x="900" y="650" width="360" height="44" rx="10" fill="#0F131A" stroke="#2A3240"/>
+  <text x="152" y="678" font-family="Arial" font-size="12" fill="#9AA4B2">Name</text>
+  <text x="532" y="678" font-family="Arial" font-size="12" fill="#9AA4B2">Work email</text>
+  <text x="912" y="678" font-family="Arial" font-size="12" fill="#9AA4B2">Company</text>
+
+  <rect x="140" y="710" width="360" height="44" rx="10" fill="#0F131A" stroke="#2A3240"/>
+  <rect x="520" y="710" width="360" height="44" rx="10" fill="#0F131A" stroke="#2A3240"/>
+  <rect x="900" y="710" width="360" height="44" rx="10" fill="#0F131A" stroke="#2A3240"/>
+  <text x="152" y="738" font-family="Arial" font-size="12" fill="#9AA4B2">Role (optional)</text>
+  <text x="532" y="738" font-family="Arial" font-size="12" fill="#9AA4B2">Monthly volume</text>
+  <text x="912" y="738" font-family="Arial" font-size="12" fill="#9AA4B2">Start timeline</text>
+
+  <rect x="140" y="770" width="740" height="44" rx="10" fill="#0F131A" stroke="#2A3240"/>
+  <text x="152" y="798" font-family="Arial" font-size="12" fill="#9AA4B2">Primary use case</text>
+  <rect x="900" y="770" width="160" height="44" rx="12" fill="#7CF3C7"/>
+  <text x="925" y="798" font-family="Arial" font-size="14" fill="#0D1117">Join whitelist</text>
+  <rect x="1070" y="770" width="190" height="44" rx="12" fill="none" stroke="#2A3240"/>
+  <text x="1090" y="798" font-family="Arial" font-size="14" fill="#E6EAF2">Contact sales</text>
+</svg>

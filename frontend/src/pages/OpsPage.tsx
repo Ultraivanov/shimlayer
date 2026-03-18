@@ -2252,6 +2252,9 @@ export function OpsPage() {
                       : "auto-renew: idle")
                 : "auto-renew: off"}
             </span>
+            <span className="muted">
+              Tip: Take next claims the next unclaimed/expired item. Auto-renew only extends locks you own.
+            </span>
             <Button
               view="outlined"
               data-testid="ops-manual-renew-now"

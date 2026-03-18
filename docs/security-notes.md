@@ -9,6 +9,15 @@ This document captures the minimum security posture expected for alpha/beta depl
   - basic auth at the edge
 - Do not expose `VITE_ADMIN_KEY` or `VITE_API_KEY` publicly without a proper auth layer.
 
+## UI access policy (choose one)
+- **Internal-only (recommended for alpha):**
+  - UI is reachable only via VPN/allowlist or internal network.
+  - `VITE_ADMIN_KEY` may be used but is still treated as sensitive.
+- **Public UI (not recommended without auth):**
+  - Do not ship admin keys to the browser.
+  - Introduce an auth proxy / SSO and issue short-lived tokens.
+  - Require user identity for all admin actions.
+
 ## Admin headers
 - Ops endpoints require:
   - `X-Admin-Key`, `X-Admin-Role`, `X-Admin-User`
@@ -27,4 +36,3 @@ This document captures the minimum security posture expected for alpha/beta depl
 ## Startup warnings
 - Production logs must not include `startup_security_warning`.
 - If present, rotate secrets and re-check env vars.
-
