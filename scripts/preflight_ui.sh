@@ -48,7 +48,12 @@ else
   # If so, treat Playwright as skipped rather than failed.
   if echo "$pw_out" | grep -qiE "attempting to bind.*127\\.0\\.0\\.1.*8000.*operation not permitted"; then
     echo "$pw_out"
-    echo "SKIP: playwright ops smoke (localhost bind not permitted in this environment)"
+    if [[ "${SHIMLAYER_STRICT_UI_SMOKE:-0}" == "1" ]]; then
+      echo "FAIL: playwright ops smoke (localhost bind not permitted; strict mode enabled)"
+      failures=$((failures + 1))
+    else
+      echo "SKIP: playwright ops smoke (localhost bind not permitted in this environment)"
+    fi
   else
     echo "$pw_out"
     echo "FAIL: playwright ops smoke"

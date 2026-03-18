@@ -75,6 +75,7 @@ export function RequesterPage({ pushTask }: Props) {
   const [proofMetadataJson, setProofMetadataJson] = useState<string>("{}");
   const [proofBusy, setProofBusy] = useState(false);
   const [proofAllowMetadataOnly, setProofAllowMetadataOnly] = useState<boolean>(false);
+  const [proofAdvancedOpen, setProofAdvancedOpen] = useState<boolean>(false);
   const [artifactsMode, setArtifactsMode] = useState<ArtifactsMode>("upload");
   const [taskActionBusy, setTaskActionBusy] = useState(false);
   const [workerNoteDraft, setWorkerNoteDraft] = useState<string>("");
@@ -590,6 +591,7 @@ export function RequesterPage({ pushTask }: Props) {
     setProofChecksum("");
     setProofMetadataJson("{}");
     setProofAllowMetadataOnly(false);
+    setProofAdvancedOpen(false);
   }, [selectedTask?.id]);
 
   useEffect(() => {
@@ -901,6 +903,8 @@ export function RequesterPage({ pushTask }: Props) {
       setProofStoragePath("");
       setProofChecksum("");
       setProofMetadataJson("{}");
+      setProofAllowMetadataOnly(false);
+      setProofAdvancedOpen(false);
       await refresh();
       pushToast("success", proofWouldBeQuality ? "Proof registered (quality)" : "Proof metadata registered");
       return true;
@@ -1122,7 +1126,7 @@ export function RequesterPage({ pushTask }: Props) {
         {openAiMode === "ingest" ? (
           <div className="detail-block">
             <p className="muted" style={{ marginTop: 0 }}>
-              Turn an OpenAI tool-call interruption into a ShimLayer task, then decide and resume safely.
+              Create a ShimLayer task from an OpenAI interruption, record a human decision, then resume your run.
             </p>
             <div className="row-tight" style={{ alignItems: "center" }}>
               <TextInput size="m" value={openAiInterruptionId} onUpdate={setOpenAiInterruptionId} placeholder="interruption_id" disabled={openAiBusy} />
@@ -1199,6 +1203,13 @@ export function RequesterPage({ pushTask }: Props) {
               {openAiRecord.agent_name ? ` · agent ${openAiRecord.agent_name}` : ""}
               {" "}· tool {openAiRecord.tool_name}
             </p>
+            {openAiRecord.decision ? (
+              <p className="muted" style={{ marginTop: 6, marginBottom: 0 }}>
+                Decision: <span className="mono">{openAiRecord.decision}</span>
+                {openAiRecord.decision_actor ? <span className="muted"> · by <span className="mono">{openAiRecord.decision_actor}</span></span> : null}
+                {openAiRecord.decision_note ? <span className="muted"> · note “{openAiRecord.decision_note}”</span> : null}
+              </p>
+            ) : null}
             <div className="row-tight" style={{ alignItems: "center", flexWrap: "wrap", marginTop: 8 }}>
               <span className="chip mono">task {openAiRecord.task_id.slice(0, 8)}</span>
               <Button
@@ -1259,7 +1270,12 @@ export function RequesterPage({ pushTask }: Props) {
             </div>
             {openAiResume ? (
               <div style={{ marginTop: 8 }}>
-                <p className="muted" style={{ margin: "0 0 6px 0" }}>Resume payload</p>
+                <div className="row-tight" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                  <p className="muted" style={{ margin: "0 0 6px 0" }}>Resume payload</p>
+                  <Button size="s" view="flat" onClick={() => void copyText(prettyJson(openAiResume.resume_payload))}>
+                    Copy payload
+                  </Button>
+                </div>
                 <pre className="json-code" data-testid="requester-openai-resume-payload">{prettyJson(openAiResume.resume_payload)}</pre>
               </div>
             ) : null}
@@ -1674,6 +1690,38 @@ export function RequesterPage({ pushTask }: Props) {
                 <p className="muted" style={{ marginTop: 6 }}>
                   Completion requires quality proof: at least one artifact with `local:` storage or a valid `checksum_sha256`.
                 </p>
+                {!hasQualityProof ? (
+                  <div className="row-tight" style={{ marginTop: 8, flexWrap: "wrap" }}>
+                    <Button
+                      size="s"
+                      view="action"
+                      disabled={taskActionBusy}
+                      onClick={() => {
+                        setArtifactsMode("upload");
+                        window.setTimeout(() => {
+                          document.querySelector('[data-testid="requester-artifacts"]')?.scrollIntoView({ behavior: "smooth", block: "start" });
+                        }, 0);
+                      }}
+                      title="Upload a local artifact (recommended)"
+                    >
+                      Upload local proof
+                    </Button>
+                    <Button
+                      size="s"
+                      view="outlined"
+                      disabled={taskActionBusy}
+                      onClick={() => {
+                        setArtifactsMode("register");
+                        window.setTimeout(() => {
+                          document.querySelector('[data-testid="requester-artifacts"]')?.scrollIntoView({ behavior: "smooth", block: "start" });
+                        }, 0);
+                      }}
+                      title="Link external proof (requires checksum_sha256 to unblock completion)"
+                    >
+                      Link external proof
+                    </Button>
+                  </div>
+                ) : null}
               </Card>
             ) : null}
             <div className="grid two-col">
@@ -1727,15 +1775,24 @@ export function RequesterPage({ pushTask }: Props) {
                       </p>
                     </div>
 	                  <div className="row-tight" style={{ alignItems: "center" }}>
-	                    <Button size="s" view="flat" disabled={proofBusy || !selectedTask} onClick={() => applyProofTemplate("s3")}>
+	                    <Button size="s" view="outlined" disabled={proofBusy || !selectedTask} onClick={() => applyProofTemplate("s3")}>
 	                      S3 template
 	                    </Button>
-	                    <Button size="s" view="flat" disabled={proofBusy || !selectedTask} onClick={() => applyProofTemplate("gcs")}>
+	                    <Button size="s" view="outlined" disabled={proofBusy || !selectedTask} onClick={() => applyProofTemplate("gcs")}>
 	                      GCS template
 	                    </Button>
-	                    <Button size="s" view="flat" disabled={proofBusy || !selectedTask} onClick={() => applyProofTemplate("http")}>
+	                    <Button size="s" view="outlined" disabled={proofBusy || !selectedTask} onClick={() => applyProofTemplate("http")}>
 	                      HTTP(S) template
 	                    </Button>
+                      <Button
+                        size="s"
+                        view={proofAdvancedOpen ? "action" : "flat"}
+                        disabled={proofBusy}
+                        onClick={() => setProofAdvancedOpen((v) => !v)}
+                        title="Show/hide advanced fields"
+                      >
+                        Advanced
+                      </Button>
 	                    {proofStorageScheme ? <span className="chip">scheme {proofStorageScheme}</span> : null}
 	                  </div>
 	                  <div className="row-tight" style={{ alignItems: "center" }}>
@@ -1779,35 +1836,35 @@ export function RequesterPage({ pushTask }: Props) {
                                         ? "Add checksum_sha256 (or use local:) to unblock completion"
                                         : "Register proof link"
                             }
-			                      onClick={() =>
-			                        void registerProofMetadata().then((ok) => {
-			                          if (ok && proofWouldBeQuality) setArtifactsMode("upload");
-			                        })
-		                      }
+			                      onClick={() => void registerProofMetadata()}
 		                    >
 		                      {proofWouldBeQuality ? "Register proof" : proofAllowMetadataOnly ? "Register metadata (won’t unblock)" : "Add checksum to register"}
 		                    </Button>
 	                  </div>
-                    {!proofWouldBeQuality ? (
-                      <label className="muted" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
-                        <input
-                          type="checkbox"
-                          checked={proofAllowMetadataOnly}
-                          onChange={(e) => setProofAllowMetadataOnly(e.currentTarget.checked)}
-                          disabled={proofBusy}
-                        />
-                        Allow metadata-only link (won’t unblock completion)
-                      </label>
+                    {proofAdvancedOpen || proofAllowMetadataOnly || proofMetadataJson.trim() !== "{}" ? (
+                      <>
+                        {!proofWouldBeQuality ? (
+                          <label className="muted" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+                            <input
+                              type="checkbox"
+                              checked={proofAllowMetadataOnly}
+                              onChange={(e) => setProofAllowMetadataOnly(e.currentTarget.checked)}
+                              disabled={proofBusy}
+                            />
+                            Allow metadata-only link (won’t unblock completion)
+                          </label>
+                        ) : null}
+                        <div style={{ marginTop: 6 }}>
+                          <TextArea
+                            value={proofMetadataJson}
+                            onUpdate={setProofMetadataJson}
+                            placeholder='metadata JSON (e.g. {"source":"s3"})'
+                            disabled={proofBusy}
+                            minRows={4}
+                          />
+                        </div>
+                      </>
                     ) : null}
-	                  <div style={{ marginTop: 6 }}>
-	                    <TextArea
-	                      value={proofMetadataJson}
-	                      onUpdate={setProofMetadataJson}
-	                      placeholder='metadata JSON (e.g. {"source":"s3"})'
-	                      disabled={proofBusy}
-	                      minRows={4}
-	                    />
-	                  </div>
                     {proofChecksumError || proofMetadataError ? (
                       <p className="muted" style={{ marginTop: 6 }}>
                         {proofChecksumError ? <span className="muted">checksum: {proofChecksumError}</span> : null}

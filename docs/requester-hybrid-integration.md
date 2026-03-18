@@ -7,6 +7,22 @@ ShimLayer supports a **hybrid delivery model**:
 
 This hybrid approach gives fast UX (webhook) while staying reliable under outages, deploys, and transient networking issues (pull).
 
+## 0) OpenAI interruptions (resume loop)
+
+If you integrate ShimLayer as a HITL “resume” loop for agent interruptions:
+
+- **Ingest:** `POST /v1/openai/interruptions/ingest` creates a backing ShimLayer task and returns the interruption record (including `task_id`).
+- **Decide:** a human (typically Operator) records `approve|reject` via `POST /v1/openai/interruptions/{interruption_id}/decision`.
+  - This also completes the backing task (so normal task push/pull behavior applies).
+- **Resume:** `POST /v1/openai/interruptions/{interruption_id}/resume` marks the interruption as resumed and returns a `resume_payload` (JSON) you can pass back to your agent/runtime.
+
+Reliability guidance:
+
+- Persist `{interruption_id -> task_id}` so you can always “join” the interruption record to the task timeline.
+- For user-facing state, you can either:
+  - follow the backing task via `GET /v1/tasks/{task_id}` / `/v1/tasks/sync`, or
+  - poll the interruption record directly via `GET /v1/openai/interruptions/{interruption_id}`.
+
 ## 1) What to persist in Requester
 
 Minimum state you should persist (durable storage):
@@ -74,4 +90,3 @@ Semantics:
 
 - returns tasks where `(updated_at, id)` is **strictly greater** than the cursor tuple
 - ordering is `updated_at asc, id asc` (stable for pagination)
-

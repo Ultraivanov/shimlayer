@@ -15,6 +15,14 @@ This doc describes the end-to-end path in simple, user-facing terms.
    - **Push**: webhook delivery to `callback_url` (best for latency).
    - **Pull fallback**: Requester UI/API can poll task state and/or sync the task list (best for reliability).
 
+## OpenAI Interruptions Path (HITL “resume” loop)
+This path is for **agent workflows that get interrupted** (e.g., tool call needs approval) and need a human decision before continuing.
+
+1. **Requester ingests an interruption** (creates a backing task automatically).
+2. **Operator opens the interruption task** and **Approve/Rejects** the decision.
+3. **Requester (or Operator) requests a resume payload** (server marks the interruption as resumed and returns the payload).
+4. **Requester resumes the agent run** using that payload (your app sends it to your agent/runtime; optional callback delivery can also be used).
+
 ## Safety Path (Auto-check → Manual Review Queue)
 1. Task completes and the server runs an **auto-check** (with optional PII redaction before provider calls).
 2. If flagged, the flow enters **Manual review**.
@@ -52,5 +60,11 @@ sequenceDiagram
     S-->>R: Webhook delivery (push)
     R->>S: Sync/poll (pull fallback)
   end
-```
 
+  alt OpenAI interruption (resume loop)
+    R->>S: Ingest interruption (creates task)
+    O->>S: Approve/Reject decision (completes task)
+    R->>S: Request resume payload
+    S-->>R: Resume payload (JSON)
+  end
+```

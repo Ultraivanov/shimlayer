@@ -69,6 +69,7 @@ export function OperatorPage() {
   const [proofMetadataJson, setProofMetadataJson] = useState<string>("{}");
   const [proofBusy, setProofBusy] = useState<boolean>(false);
   const [proofAllowMetadataOnly, setProofAllowMetadataOnly] = useState<boolean>(false);
+  const [proofAdvancedOpen, setProofAdvancedOpen] = useState<boolean>(false);
 
   const [openAiInterruptionId, setOpenAiInterruptionId] = useState<string>("");
   const [openAiRecord, setOpenAiRecord] = useState<OpenAIInterruptionRecord | null>(null);
@@ -201,6 +202,7 @@ export function OperatorPage() {
   useEffect(() => {
     // Reduce visual noise: collapse "More" when switching tasks.
     setShowMoreActions(false);
+    setProofAdvancedOpen(false);
   }, [selectedTaskId]);
 
   async function openById() {
@@ -344,6 +346,7 @@ export function OperatorPage() {
   useEffect(() => {
     if (autoRefreshSeconds === 0 || !isPageVisible) return;
     const timer = window.setInterval(() => {
+      if (isWorking || proofBusy || openAiBusy) return;
       if (Date.now() < autoRefreshPausedUntilMs) return;
       void refresh().then((res) => {
         if (res.ok) {
@@ -358,7 +361,16 @@ export function OperatorPage() {
       });
     }, autoRefreshSeconds * 1000);
     return () => window.clearInterval(timer);
-  }, [autoRefreshSeconds, isPageVisible, autoRefreshFailureCount, autoRefreshLastError, autoRefreshPausedUntilMs]);
+  }, [
+    autoRefreshSeconds,
+    isPageVisible,
+    isWorking,
+    openAiBusy,
+    proofBusy,
+    autoRefreshFailureCount,
+    autoRefreshLastError,
+    autoRefreshPausedUntilMs
+  ]);
 
   useEffect(() => {
     if (!selectedTaskId && filteredTasks.length > 0) setSelectedTaskId(filteredTasks[0].id);
@@ -515,6 +527,8 @@ export function OperatorPage() {
       setProofStoragePath("");
       setProofChecksum("");
       setProofMetadataJson("{}");
+      setProofAllowMetadataOnly(false);
+      setProofAdvancedOpen(false);
       await refresh();
       pushToast("success", proofWouldBeQuality ? "Proof registered (quality)" : "Proof metadata registered");
       return true;
@@ -858,6 +872,11 @@ export function OperatorPage() {
                       </>
                     ) : null}
                   </p>
+                  {openAiRecord.decision_note ? (
+                    <p className="muted" style={{ marginTop: 0, marginBottom: 0 }}>
+                      note “{openAiRecord.decision_note}”
+                    </p>
+                  ) : null}
                   <div className="row-tight" style={{ alignItems: "center" }}>
                     <TextInput
                       size="m"
@@ -899,7 +918,12 @@ export function OperatorPage() {
 
               {openAiResume ? (
                 <div className="detail-block" style={{ marginTop: 8 }}>
-                  <p className="muted" style={{ marginTop: 0 }}>Resume payload</p>
+                  <div className="row-tight" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                    <p className="muted" style={{ marginTop: 0 }}>Resume payload</p>
+                    <Button size="s" view="flat" onClick={() => void copyText(prettyJson(openAiResume.resume_payload))}>
+                      Copy payload
+                    </Button>
+                  </div>
                   <pre className="json-code" data-testid="operator-openai-resume-payload">{prettyJson(openAiResume.resume_payload)}</pre>
                 </div>
               ) : null}
@@ -909,6 +933,29 @@ export function OperatorPage() {
               <p className="muted">
                 Completion requires quality proof. Upload a local file (recommended) or register an external proof with <span className="mono">checksum_sha256</span>.
               </p>
+            ) : null}
+            {isActionable && !hasQualityProof && !isOpenAiInterruptionTask ? (
+              <div className="row-tight" style={{ flexWrap: "wrap" }}>
+                <Button
+                  size="s"
+                  view="action"
+                  disabled={isWorking}
+                  loading={isWorking}
+                  onClick={() => void addProof()}
+                  title="Upload local proof artifact (quality proof)"
+                >
+                  Upload local proof
+                </Button>
+                <Button
+                  size="s"
+                  view="outlined"
+                  disabled={proofBusy || isWorking}
+                  onClick={scrollToProofForm}
+                  title="Register external proof link (requires checksum_sha256 to unblock completion)"
+                >
+                  Link external proof
+                </Button>
+              </div>
             ) : null}
             {!isOpenAiInterruptionTask ? (
               <div className="detail-block" ref={proofFormRef} data-testid="operator-proof">
@@ -923,6 +970,15 @@ export function OperatorPage() {
                   </Button>
                   <Button size="s" view="outlined" disabled={!selectedTask || !isActionable || proofBusy || isWorking} onClick={() => loadProofPreset("http")}>
                     HTTP preset
+                  </Button>
+                  <Button
+                    size="s"
+                    view={proofAdvancedOpen ? "action" : "flat"}
+                    disabled={proofBusy || isWorking}
+                    onClick={() => setProofAdvancedOpen((v) => !v)}
+                    title="Show/hide advanced fields"
+                  >
+                    Advanced
                   </Button>
                 </div>
               </div>
@@ -981,15 +1037,17 @@ export function OperatorPage() {
 	                  {proofWouldBeQuality ? "Register proof" : proofAllowMetadataOnly ? "Register metadata (won’t unblock)" : "Add checksum to register"}
 	                </Button>
               </div>
-              <div style={{ marginTop: 8 }}>
-                <TextArea
-                  value={proofMetadataJson}
-                  onUpdate={setProofMetadataJson}
-                  placeholder="metadata JSON (object)"
-                  minRows={4}
-                  disabled={!isActionable || proofBusy}
-                />
-              </div>
+              {proofAdvancedOpen || proofAllowMetadataOnly || proofMetadataJson.trim() !== "{}" ? (
+                <div style={{ marginTop: 8 }}>
+                  <TextArea
+                    value={proofMetadataJson}
+                    onUpdate={setProofMetadataJson}
+                    placeholder="metadata JSON (object)"
+                    minRows={4}
+                    disabled={!isActionable || proofBusy}
+                  />
+                </div>
+              ) : null}
               {proofChecksumError || proofMetadataError ? (
                 <p className="muted" style={{ marginTop: 6 }}>
                   {proofChecksumError ? <span className="muted">checksum: {proofChecksumError}</span> : null}
@@ -997,16 +1055,18 @@ export function OperatorPage() {
                   {proofMetadataError ? <span className="muted">metadata: {proofMetadataError}</span> : null}
                 </p>
               ) : null}
-              {!proofWouldBeQuality ? (
-                <label className="muted" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
-                  <input
-                    type="checkbox"
-                    checked={proofAllowMetadataOnly}
-                    onChange={(e) => setProofAllowMetadataOnly(e.currentTarget.checked)}
-                    disabled={proofBusy}
-                  />
-                  Allow metadata-only registration (won’t unblock completion)
-                </label>
+              {proofAdvancedOpen || proofAllowMetadataOnly ? (
+                !proofWouldBeQuality ? (
+                  <label className="muted" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+                    <input
+                      type="checkbox"
+                      checked={proofAllowMetadataOnly}
+                      onChange={(e) => setProofAllowMetadataOnly(e.currentTarget.checked)}
+                      disabled={proofBusy}
+                    />
+                    Allow metadata-only registration (won’t unblock completion)
+                  </label>
+                ) : null
               ) : null}
               </div>
             ) : (

@@ -58,6 +58,10 @@ pytest -q
 
 - End-to-end user journey (Requester → Operator → Ops): `docs/user-journey.md`
 - Requester hybrid integration (push + pull fallback): `docs/requester-hybrid-integration.md`
+- OpenAI interruptions (resume loop): `docs/requester-hybrid-integration.md` (section 0)
+- Alpha local runbook: `docs/alpha-local-runbook.md`
+- Deploy runbook: `docs/deploy-runbook-v0.md`
+- Deploy handoff (for specialist): `docs/deploy-handoff.md`
 
 Fast backend checks (no docker):
 ```bash

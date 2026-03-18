@@ -230,7 +230,7 @@ export function OpsPage() {
   const [pinnedFlowId, setPinnedFlowId] = useState<string>("");
   const [sortMode, setSortMode] = useState<SortMode>(() => (localStorage.getItem("ops.sortMode") as SortMode) || "updated_desc");
   const [activeView, setActiveView] = useState<OpsView>(() => (localStorage.getItem("ops.activeView") as OpsView) || "all");
-  const [flowQueueView, setFlowQueueView] = useState<FlowQueueViewMode>(() => (localStorage.getItem("ops.flowQueueView") as FlowQueueViewMode) || "list");
+  const [flowQueueView, setFlowQueueView] = useState<FlowQueueViewMode>(() => (localStorage.getItem("ops.flowQueueView") as FlowQueueViewMode) || "tiles");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
@@ -1098,6 +1098,7 @@ export function OpsPage() {
   useEffect(() => {
     if (autoRefreshSeconds === 0 || !isPageVisible) return;
     const timer = window.setInterval(() => {
+      if (isRefreshing || isClaimRunning || isActionRunning || isLockRenewing || lockRenewInFlightRef.current) return;
       if (Date.now() < autoRefreshPausedUntilMs) return;
       void refresh({ source: "auto" }).then((res) => {
         if (res.ok) {
@@ -1109,11 +1110,22 @@ export function OpsPage() {
         setAutoRefreshLastError(res.error ?? "unknown error");
         const pauseSeconds = Math.min(300, 15 * 2 ** Math.min(4, nextFailures - 1));
         setAutoRefreshPausedUntilMs(Date.now() + pauseSeconds * 1000);
-        pushToast("error", `Auto-refresh failed; pausing for ${pauseSeconds}s`);
+        // Avoid noisy repeated toasts; announce only when entering pause.
+        if (autoRefreshFailureCount === 0) pushToast("error", `Auto-refresh failed; pausing for ${pauseSeconds}s`);
       });
     }, autoRefreshSeconds * 1000);
     return () => window.clearInterval(timer);
-  }, [autoRefreshSeconds, isPageVisible, autoRefreshFailureCount, autoRefreshLastError, autoRefreshPausedUntilMs]);
+  }, [
+    autoRefreshSeconds,
+    isActionRunning,
+    isClaimRunning,
+    isLockRenewing,
+    isPageVisible,
+    isRefreshing,
+    autoRefreshFailureCount,
+    autoRefreshLastError,
+    autoRefreshPausedUntilMs
+  ]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
@@ -2211,8 +2223,8 @@ export function OpsPage() {
               {manualQueueAutoRefreshSeconds === 0
                 ? "queue: off"
                 : manualQueuePausedUntilMs && nowMs < manualQueuePausedUntilMs
-                  ? `queue: paused ${formatRemaining(manualQueuePausedUntilMs - nowMs)}`
-                  : "queue: on"}
+                  ? `queue: paused ${formatRemaining(manualQueuePausedUntilMs - nowMs)} (${manualQueueAutoRefreshSeconds}s)`
+                  : `queue: ${manualQueueAutoRefreshSeconds}s`}
             </span>
             {manualQueueAutoRefreshSeconds !== 0 && manualQueuePausedUntilMs && nowMs < manualQueuePausedUntilMs ? (
               <Button view="flat" size="s" onClick={resetManualQueueAutoRefreshPause}>
@@ -2340,10 +2352,18 @@ export function OpsPage() {
 	        </div>
         <div className="row-tight">
           <span className="muted">Presets:</span>
-          <Button view="outlined" onClick={() => applyFlowPreset("overdue")}>Only overdue</Button>
-          <Button view="outlined" onClick={() => applyFlowPreset("disputed")}>Disputed</Button>
-          <Button view="outlined" onClick={() => applyFlowPreset("sla_risk")}>SLA risk</Button>
-          <Button view="outlined" data-testid="ops-preset-manual-review" onClick={() => applyFlowPreset("manual_review")}>Manual review</Button>
+          <Button view="outlined" onClick={() => applyFlowPreset("overdue")}>
+            Only overdue{typeof metrics?.tasks_overdue === "number" ? ` (${metrics.tasks_overdue})` : ""}
+          </Button>
+          <Button view="outlined" onClick={() => applyFlowPreset("disputed")}>
+            Disputed{typeof (metrics?.task_status_counts?.disputed) === "number" ? ` (${metrics.task_status_counts.disputed})` : ""}
+          </Button>
+          <Button view="outlined" onClick={() => applyFlowPreset("sla_risk")}>
+            SLA risk{typeof metrics?.tasks_sla_risk === "number" ? ` (${metrics.tasks_sla_risk})` : ""}
+          </Button>
+          <Button view="outlined" data-testid="ops-preset-manual-review" onClick={() => applyFlowPreset("manual_review")}>
+            Manual review{typeof metrics?.manual_review_pending === "number" ? ` (${metrics.manual_review_pending})` : ""}
+          </Button>
           <Button view="flat" onClick={() => applyFlowPreset("clear")}>Reset</Button>
           <span className="muted" style={{ marginLeft: 8 }}>View:</span>
           <Button view={flowQueueView === "list" ? "action" : "outlined"} onClick={() => setFlowQueueView("list")}>List</Button>

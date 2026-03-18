@@ -8,6 +8,8 @@ Use this checklist before onboarding external alpha customers.
   - `tests/test_smoke_flow.py`
   - `tests/test_webhook_worker.py`
   - `tests/test_webhook_verification.py`
+- OpenAI interruptions/resume worker e2e passes:
+  - `tests/test_openai_resume_worker_e2e.py`
 - Postgres integration test passes:
   - `pytest -q -m postgres tests/test_postgres_webhook_queue.py`
 
@@ -26,6 +28,8 @@ Use this checklist before onboarding external alpha customers.
   - flow credits restore on refund
 - Task lifecycle:
   - `create -> claim -> complete -> proof -> get`
+- OpenAI interruptions (resume loop):
+  - `ingest -> operator decide -> resume payload -> requester resumes run`
 - Webhooks:
   - jobs enqueue from task state transitions
   - worker sends events with signature + timestamp

@@ -70,10 +70,20 @@ if command -v docker >/dev/null 2>&1; then
       echo "SKIP: pytest module not installed for postgres test"
     fi
   else
-    echo "SKIP: docker daemon not available (compose/postgres steps skipped)"
+    if [[ "${SHIMLAYER_STRICT_DOCKER:-0}" == "1" ]]; then
+      echo "FAIL: docker daemon not available (strict mode enabled)"
+      failures=$((failures + 1))
+    else
+      echo "SKIP: docker daemon not available (compose/postgres steps skipped)"
+    fi
   fi
 else
-  echo "SKIP: docker not found (compose/postgres steps skipped)"
+  if [[ "${SHIMLAYER_STRICT_DOCKER:-0}" == "1" ]]; then
+    echo "FAIL: docker not found (strict mode enabled)"
+    failures=$((failures + 1))
+  else
+    echo "SKIP: docker not found (compose/postgres steps skipped)"
+  fi
 fi
 
 if [[ "$failures" -gt 0 ]]; then
