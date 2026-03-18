@@ -13,4 +13,4 @@ echo "==> playwright browser install (chromium)"
 npm run e2e:install
 
 echo "==> playwright ops smoke"
-npm run e2e -- ops-smoke.spec.ts requester-smoke.spec.ts operator-smoke.spec.ts openai-interruptions.spec.ts
+npm run e2e -- ops-smoke.spec.ts requester-smoke.spec.ts operator-smoke.spec.ts openai-interruptions.spec.ts openai-interruptions-ui.spec.ts openai-interruptions-operator-ui.spec.ts

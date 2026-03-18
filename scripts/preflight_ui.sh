@@ -36,7 +36,7 @@ run_step "playwright browser install" npm --prefix "$FRONTEND_DIR" run e2e:insta
 echo "==> playwright ops smoke"
 set +e
 pw_out="$(
-  npm --prefix "$FRONTEND_DIR" run e2e -- ops-smoke.spec.ts requester-smoke.spec.ts operator-smoke.spec.ts openai-interruptions.spec.ts 2>&1
+  npm --prefix "$FRONTEND_DIR" run e2e -- ops-smoke.spec.ts requester-smoke.spec.ts operator-smoke.spec.ts openai-interruptions.spec.ts openai-interruptions-ui.spec.ts openai-interruptions-operator-ui.spec.ts 2>&1
 )"
 pw_rc="$?"
 set -e

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Card, Select, TextArea, TextInput } from "@gravity-ui/uikit";
 
 import { Api } from "../api";
-import type { Task, TaskWithReview } from "../types";
+import type { OpenAIInterruptionRecord, OpenAIResumeResponse, Task, TaskWithReview } from "../types";
 import { ArtifactTile } from "../components/ArtifactTile";
 
 type ToastLevel = "success" | "error";
@@ -26,6 +26,14 @@ function isTypingTarget(target: EventTarget | null): boolean {
 
 function isSha256Hex(value: string): boolean {
   return /^[0-9a-f]{64}$/i.test(value);
+}
+
+function prettyJson(value: unknown): string {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
 }
 
 export function OperatorPage() {
@@ -61,6 +69,12 @@ export function OperatorPage() {
   const [proofMetadataJson, setProofMetadataJson] = useState<string>("{}");
   const [proofBusy, setProofBusy] = useState<boolean>(false);
   const [proofAllowMetadataOnly, setProofAllowMetadataOnly] = useState<boolean>(false);
+
+  const [openAiInterruptionId, setOpenAiInterruptionId] = useState<string>("");
+  const [openAiRecord, setOpenAiRecord] = useState<OpenAIInterruptionRecord | null>(null);
+  const [openAiResume, setOpenAiResume] = useState<OpenAIResumeResponse | null>(null);
+  const [openAiDecisionNote, setOpenAiDecisionNote] = useState<string>("");
+  const [openAiBusy, setOpenAiBusy] = useState<boolean>(false);
 
   const TASK_STATUSES = ["any", "pending", "queued", "claimed", "completed", "failed", "disputed", "refunded"] as const;
   const TASK_TYPES = ["any", "stuck_recovery", "quick_judgment"] as const;
@@ -212,6 +226,104 @@ export function OperatorPage() {
       setError(`Open failed: ${String(e)}`);
     } finally {
       setOpenTaskBusy(false);
+    }
+  }
+
+  async function openTask(taskId: string) {
+    const id = String(taskId || "").trim();
+    if (!id) return;
+    if (!isUuidLike(id)) {
+      setError("Invalid Task ID (expected UUID)");
+      return;
+    }
+    setError(null);
+    try {
+      const task = await Api.getTask(id);
+      setSelectedTaskId(task.id);
+      setSelectedTaskDetail(task);
+      setTasks((prev) => {
+        const next = [task as unknown as Task, ...prev.filter((t) => t.id !== task.id)];
+        return next;
+      });
+    } catch (e) {
+      setError(`Open failed: ${String(e)}`);
+    }
+  }
+
+  const openAiFromSelectedTask = useMemo(() => {
+    const ctx = selectedTaskDetail?.context ?? null;
+    const src = ctx && typeof ctx === "object" ? (ctx as any).source : null;
+    if (src !== "openai.interruption") return null;
+    const interruptionId = typeof (ctx as any).interruption_id === "string" ? String((ctx as any).interruption_id) : "";
+    const runId = typeof (ctx as any).run_id === "string" ? String((ctx as any).run_id) : "";
+    const toolName = typeof (ctx as any).tool_name === "string" ? String((ctx as any).tool_name) : "";
+    return { interruptionId, runId, toolName };
+  }, [selectedTaskDetail]);
+
+  const isOpenAiInterruptionTask = Boolean(openAiFromSelectedTask?.interruptionId);
+
+  async function loadOpenAiInterruption(interruptionId: string, opts?: { preserveResume?: boolean }) {
+    const id = interruptionId.trim();
+    if (!id) return;
+    if (openAiBusy) return;
+    setOpenAiBusy(true);
+    setError(null);
+    try {
+      const record = await Api.getOpenAIInterruption(id);
+      setOpenAiRecord(record);
+      if (!opts?.preserveResume) setOpenAiResume(null);
+      setOpenAiInterruptionId(record.interruption_id);
+      pushToast("success", "Loaded interruption");
+      await refresh();
+    } catch (e) {
+      setError(String(e));
+      pushToast("error", `Load interruption failed: ${String(e)}`);
+    } finally {
+      setOpenAiBusy(false);
+    }
+  }
+
+  async function decideOpenAiInterruption(decision: "approve" | "reject") {
+    const id = (openAiRecord?.interruption_id || openAiInterruptionId).trim();
+    if (!id) return;
+    if (openAiBusy) return;
+    setOpenAiBusy(true);
+    setError(null);
+    try {
+      const record = await Api.decideOpenAIInterruption(id, {
+        decision,
+        actor: "operator",
+        note: openAiDecisionNote.trim() ? openAiDecisionNote.trim() : null,
+        output: {},
+      });
+      setOpenAiRecord(record);
+      pushToast("success", `Decision recorded: ${decision}`);
+      await refresh();
+      await openTask(record.task_id);
+    } catch (e) {
+      setError(String(e));
+      pushToast("error", `Decision failed: ${String(e)}`);
+    } finally {
+      setOpenAiBusy(false);
+    }
+  }
+
+  async function resumeOpenAiInterruption() {
+    const id = (openAiRecord?.interruption_id || openAiInterruptionId).trim();
+    if (!id) return;
+    if (openAiBusy) return;
+    setOpenAiBusy(true);
+    setError(null);
+    try {
+      const res = await Api.resumeOpenAIInterruption(id);
+      setOpenAiResume(res);
+      pushToast("success", "Resume payload created");
+      await loadOpenAiInterruption(id, { preserveResume: true });
+    } catch (e) {
+      setError(String(e));
+      pushToast("error", `Resume failed: ${String(e)}`);
+    } finally {
+      setOpenAiBusy(false);
     }
   }
 
@@ -468,12 +580,20 @@ export function OperatorPage() {
   const artifactsCount = (selectedTaskDetail?.artifacts ?? []).length;
   const isActionable = selectedTask?.status === "queued" || selectedTask?.status === "claimed";
 
+  useEffect(() => {
+    if (!openAiFromSelectedTask?.interruptionId) return;
+    setOpenAiInterruptionId(openAiFromSelectedTask.interruptionId);
+    setOpenAiDecisionNote("");
+    void loadOpenAiInterruption(openAiFromSelectedTask.interruptionId);
+  }, [openAiFromSelectedTask?.interruptionId]);
+
   const hotkeyStateRef = useRef({
     isWorking: false,
     filteredTasks: [] as Task[],
     selectedTaskId: "",
     selectedTask: null as Task | null,
     hasQualityProof: false,
+    isOpenAiInterruptionTask: false,
   });
   useEffect(() => {
     hotkeyStateRef.current = {
@@ -482,8 +602,9 @@ export function OperatorPage() {
       selectedTaskId,
       selectedTask: selectedTask ?? null,
       hasQualityProof,
+      isOpenAiInterruptionTask,
     };
-  }, [filteredTasks, hasQualityProof, isWorking, selectedTask, selectedTaskId]);
+  }, [filteredTasks, hasQualityProof, isOpenAiInterruptionTask, isWorking, selectedTask, selectedTaskId]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -522,7 +643,7 @@ export function OperatorPage() {
         return;
       }
       if (key === "enter" && event.shiftKey) {
-        if (s.selectedTask && (s.selectedTask.status === "queued" || s.selectedTask.status === "claimed") && s.hasQualityProof) {
+        if (!s.isOpenAiInterruptionTask && s.selectedTask && (s.selectedTask.status === "queued" || s.selectedTask.status === "claimed") && s.hasQualityProof) {
           event.preventDefault();
           void complete();
         }
@@ -667,13 +788,130 @@ export function OperatorPage() {
                 <strong>Proof:</strong> {hasQualityProof ? <span className="mono">present</span> : <span className="muted">missing</span>}
               </p>
             </div>
+            <div className="detail-block" data-testid="operator-openai-interruptions">
+              <div className="section-head">
+                <p className="muted" style={{ margin: 0 }}>
+                  OpenAI interruption
+                </p>
+                <div className="row-tight">
+                  <Button
+                    size="s"
+                    view="outlined"
+                    disabled={openAiBusy || !openAiInterruptionId.trim()}
+                    loading={openAiBusy}
+                    onClick={() => void loadOpenAiInterruption(openAiInterruptionId)}
+                    data-testid="operator-openai-load"
+                  >
+                    Load
+                  </Button>
+                  {openAiRecord ? (
+                    <Button
+                      size="s"
+                      view="outlined"
+                      disabled={openAiBusy}
+                      onClick={() => void openTask(openAiRecord.task_id)}
+                      data-testid="operator-openai-open-task"
+                    >
+                      Open task
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+              <div className="row-tight" style={{ alignItems: "center", marginTop: 8 }}>
+                <TextInput
+                  size="m"
+                  value={openAiInterruptionId}
+                  onUpdate={setOpenAiInterruptionId}
+                  placeholder="interruption_id"
+                  disabled={openAiBusy}
+                />
+                <Button
+                  size="m"
+                  view="flat"
+                  disabled={openAiBusy || !openAiInterruptionId.trim()}
+                  onClick={() => void copyText(openAiInterruptionId.trim())}
+                  title="Copy interruption_id"
+                >
+                  Copy
+                </Button>
+              </div>
+
+              {openAiFromSelectedTask ? (
+                <p className="muted" style={{ marginTop: 8, marginBottom: 0 }}>
+                  From task: <span className="mono">{openAiFromSelectedTask.runId || "run_id?"}</span> · <span className="mono">{openAiFromSelectedTask.toolName || "tool_name?"}</span>
+                </p>
+              ) : (
+                <p className="muted" style={{ marginTop: 8, marginBottom: 0 }}>
+                  Tip: open an <span className="mono">openai.interruption</span> task to auto-load its interruption_id.
+                </p>
+              )}
+
+              {openAiRecord ? (
+                <div className="detail-block" style={{ marginTop: 8 }} data-testid="operator-openai-record">
+                  <p className="muted" style={{ marginTop: 0 }}>
+                    <span className="mono">{openAiRecord.interruption_id}</span> · status: <span className="mono">{openAiRecord.status}</span>
+                    {openAiRecord.decision ? (
+                      <>
+                        {" "}
+                        · decision: <span className="mono">{openAiRecord.decision}</span>
+                        {openAiRecord.decision_actor ? <> (by <span className="mono">{openAiRecord.decision_actor}</span>)</> : null}
+                      </>
+                    ) : null}
+                  </p>
+                  <div className="row-tight" style={{ alignItems: "center" }}>
+                    <TextInput
+                      size="m"
+                      value={openAiDecisionNote}
+                      onUpdate={setOpenAiDecisionNote}
+                      placeholder="decision note (optional)"
+                      disabled={openAiBusy}
+                    />
+                    <Button
+                      size="m"
+                      view="action"
+                      disabled={openAiBusy || openAiRecord.status !== "pending"}
+                      onClick={() => void decideOpenAiInterruption("approve")}
+                      data-testid="operator-openai-decide-approve"
+                    >
+                      Approve
+                    </Button>
+                    <Button
+                      size="m"
+                      view="outlined"
+                      disabled={openAiBusy || openAiRecord.status !== "pending"}
+                      onClick={() => void decideOpenAiInterruption("reject")}
+                      data-testid="operator-openai-decide-reject"
+                    >
+                      Reject
+                    </Button>
+                    <Button
+                      size="m"
+                      view="outlined"
+                      disabled={openAiBusy || openAiRecord.status !== "decided"}
+                      onClick={() => void resumeOpenAiInterruption()}
+                      data-testid="operator-openai-resume"
+                    >
+                      Resume
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+
+              {openAiResume ? (
+                <div className="detail-block" style={{ marginTop: 8 }}>
+                  <p className="muted" style={{ marginTop: 0 }}>Resume payload</p>
+                  <pre className="json-code" data-testid="operator-openai-resume-payload">{prettyJson(openAiResume.resume_payload)}</pre>
+                </div>
+              ) : null}
+            </div>
             {!isActionable ? <p className="muted">This task is not actionable (terminal state).</p> : null}
-            {isActionable && !hasQualityProof ? (
+            {isActionable && !hasQualityProof && !isOpenAiInterruptionTask ? (
               <p className="muted">
                 Completion requires quality proof. Upload a local file (recommended) or register an external proof with <span className="mono">checksum_sha256</span>.
               </p>
             ) : null}
-            <div className="detail-block" ref={proofFormRef} data-testid="operator-proof">
+            {!isOpenAiInterruptionTask ? (
+              <div className="detail-block" ref={proofFormRef} data-testid="operator-proof">
               <div className="section-head">
                 <p className="muted" style={{ margin: 0 }}>Proof</p>
                 <div className="row-tight">
@@ -770,7 +1008,12 @@ export function OperatorPage() {
                   Allow metadata-only registration (won’t unblock completion)
                 </label>
               ) : null}
-            </div>
+              </div>
+            ) : (
+              <p className="muted">
+                This is an <span className="mono">openai.interruption</span> task. Use <span className="mono">Approve/Reject</span> above to complete it; proof upload is optional.
+              </p>
+            )}
             {selectedTaskDetail?.context ? (
               <div className="detail-block">
                 <p className="muted">Context</p>
@@ -838,10 +1081,16 @@ export function OperatorPage() {
                 size="l"
                 view="action"
                 onClick={complete}
-                disabled={!isActionable || !hasQualityProof || isWorking}
+                disabled={!isActionable || !hasQualityProof || isWorking || isOpenAiInterruptionTask}
                 loading={isWorking}
                 data-testid="operator-complete"
-                title={!hasQualityProof ? "Completion requires quality proof (upload local proof or register proof with checksum)" : "Complete selected task"}
+                title={
+                  isOpenAiInterruptionTask
+                    ? "Use OpenAI interruption Approve/Reject instead of completing directly"
+                    : !hasQualityProof
+                      ? "Completion requires quality proof (upload local proof or register proof with checksum)"
+                      : "Complete selected task"
+                }
               >
                 Complete
               </Button>

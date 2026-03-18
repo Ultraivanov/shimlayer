@@ -241,7 +241,7 @@ export function RequesterPage({ pushTask }: Props) {
     }
   }
 
-  async function loadOpenAiInterruption(interruptionId: string) {
+  async function loadOpenAiInterruption(interruptionId: string, opts?: { preserveResume?: boolean }) {
     const id = interruptionId.trim();
     if (!id) return;
     if (openAiBusy) return;
@@ -250,7 +250,7 @@ export function RequesterPage({ pushTask }: Props) {
     try {
       const record = await Api.getOpenAIInterruption(id);
       setOpenAiRecord(record);
-      setOpenAiResume(null);
+      if (!opts?.preserveResume) setOpenAiResume(null);
       setSelectedTaskId(record.task_id);
       setTaskLookupId(record.task_id);
       pushToast("success", "Loaded interruption");
@@ -341,7 +341,7 @@ export function RequesterPage({ pushTask }: Props) {
       const res = await Api.resumeOpenAIInterruption(openAiRecord.interruption_id);
       setOpenAiResume(res);
       pushToast("success", "Resume payload created");
-      await loadOpenAiInterruption(openAiRecord.interruption_id);
+      await loadOpenAiInterruption(openAiRecord.interruption_id, { preserveResume: true });
     } catch (e) {
       setError(String(e));
       pushToast("error", `Resume failed: ${String(e)}`);
@@ -1090,6 +1090,181 @@ export function RequesterPage({ pushTask }: Props) {
             Refund Task
           </Button>
         </div>
+      </Card>
+
+      <Card className="panel span-2" view="raised" data-testid="requester-openai-interruptions">
+        <div className="section-head">
+          <h2>OpenAI Interruptions</h2>
+          <div className="segmented" role="radiogroup" aria-label="OpenAI interruptions mode" data-testid="requester-openai-mode">
+            <button
+              type="button"
+              className={`segmented-btn ${openAiMode === "ingest" ? "is-active" : ""}`}
+              role="radio"
+              aria-checked={openAiMode === "ingest"}
+              onClick={() => setOpenAiMode("ingest")}
+              disabled={openAiBusy}
+            >
+              Ingest
+            </button>
+            <button
+              type="button"
+              className={`segmented-btn ${openAiMode === "load" ? "is-active" : ""}`}
+              role="radio"
+              aria-checked={openAiMode === "load"}
+              onClick={() => setOpenAiMode("load")}
+              disabled={openAiBusy}
+            >
+              Load
+            </button>
+          </div>
+        </div>
+
+        {openAiMode === "ingest" ? (
+          <div className="detail-block">
+            <p className="muted" style={{ marginTop: 0 }}>
+              Turn an OpenAI tool-call interruption into a ShimLayer task, then decide and resume safely.
+            </p>
+            <div className="row-tight" style={{ alignItems: "center" }}>
+              <TextInput size="m" value={openAiInterruptionId} onUpdate={setOpenAiInterruptionId} placeholder="interruption_id" disabled={openAiBusy} />
+              <TextInput size="m" value={openAiRunId} onUpdate={setOpenAiRunId} placeholder="run_id" disabled={openAiBusy} />
+              <TextInput size="m" value={openAiToolName} onUpdate={setOpenAiToolName} placeholder="tool_name" disabled={openAiBusy} />
+              <TextInput size="m" value={openAiSlaSeconds} onUpdate={setOpenAiSlaSeconds} placeholder="sla_seconds (30..900)" disabled={openAiBusy} />
+            </div>
+            <div className="row-tight" style={{ alignItems: "center", marginTop: 8 }}>
+              <TextInput size="m" value={openAiThreadId} onUpdate={setOpenAiThreadId} placeholder="thread_id (optional)" disabled={openAiBusy} />
+              <TextInput size="m" value={openAiAgentName} onUpdate={setOpenAiAgentName} placeholder="agent_name (optional)" disabled={openAiBusy} />
+              <TextInput size="m" value={openAiCallbackUrl} onUpdate={setOpenAiCallbackUrl} placeholder="callback_url (optional)" disabled={openAiBusy} />
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <TextArea value={openAiStateBlob} onUpdate={setOpenAiStateBlob} placeholder="state_blob (required)" minRows={3} disabled={openAiBusy} />
+            </div>
+            <div className="grid two-col" style={{ marginTop: 8 }}>
+              <div>
+                <p className="muted" style={{ margin: "0 0 6px 0" }}>tool_arguments (JSON)</p>
+                <TextArea value={openAiToolArgsJson} onUpdate={setOpenAiToolArgsJson} minRows={4} disabled={openAiBusy} />
+              </div>
+              <div>
+                <p className="muted" style={{ margin: "0 0 6px 0" }}>metadata (JSON)</p>
+                <TextArea value={openAiMetadataJson} onUpdate={setOpenAiMetadataJson} minRows={4} disabled={openAiBusy} />
+              </div>
+            </div>
+            <div className="row-tight" style={{ marginTop: 8, alignItems: "center" }}>
+              <Button
+                view="action"
+                disabled={openAiBusy}
+                loading={openAiBusy}
+                data-testid="requester-openai-ingest"
+                onClick={() => void ingestOpenAiInterruption()}
+                title="Create or return existing interruption record"
+              >
+                Ingest
+              </Button>
+              <Button
+                view="flat"
+                disabled={openAiBusy || !openAiInterruptionId.trim()}
+                data-testid="requester-openai-load"
+                onClick={() => void loadOpenAiInterruption(openAiInterruptionId)}
+              >
+                Load by interruption_id
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="detail-block">
+            <div className="row-tight" style={{ alignItems: "center" }}>
+              <TextInput size="m" value={openAiInterruptionId} onUpdate={setOpenAiInterruptionId} placeholder="interruption_id" disabled={openAiBusy} />
+              <Button
+                view="action"
+                disabled={openAiBusy || !openAiInterruptionId.trim()}
+                loading={openAiBusy}
+                data-testid="requester-openai-load"
+                onClick={() => void loadOpenAiInterruption(openAiInterruptionId)}
+              >
+                Load
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {openAiRecord ? (
+          <div className="detail-block" data-testid="requester-openai-record" style={{ marginTop: 8 }}>
+            <p style={{ marginTop: 0 }}>
+              <strong>Status:</strong>{" "}
+              <span className={`status status-${openAiRecord.status}`}>{openAiRecord.status}</span>{" "}
+              <span className="muted mono">· {openAiRecord.interruption_id}</span>
+            </p>
+            <p className="muted mono" style={{ marginTop: 6 }}>
+              run {openAiRecord.run_id}
+              {openAiRecord.thread_id ? ` · thread ${openAiRecord.thread_id}` : ""}
+              {openAiRecord.agent_name ? ` · agent ${openAiRecord.agent_name}` : ""}
+              {" "}· tool {openAiRecord.tool_name}
+            </p>
+            <div className="row-tight" style={{ alignItems: "center", flexWrap: "wrap", marginTop: 8 }}>
+              <span className="chip mono">task {openAiRecord.task_id.slice(0, 8)}</span>
+              <Button
+                size="s"
+                view="flat"
+                data-testid="requester-openai-open-task"
+                onClick={() => {
+                  setSelectedTaskId(openAiRecord.task_id);
+                  setTaskLookupId(openAiRecord.task_id);
+                  window.setTimeout(() => {
+                    document.querySelector('[data-testid="requester-task-details"]')?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }, 0);
+                }}
+              >
+                Open task
+              </Button>
+              <Button size="s" view="flat" onClick={() => void copyText(openAiRecord.task_id)}>Copy task ID</Button>
+              <Button size="s" view="flat" onClick={() => void copyText(openAiRecord.interruption_id)}>Copy interruption ID</Button>
+              <Button size="s" view="outlined" disabled={openAiBusy} onClick={() => void loadOpenAiInterruption(openAiRecord.interruption_id)}>
+                Refresh interruption
+              </Button>
+            </div>
+            <div className="row-tight" style={{ alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
+              <TextInput
+                size="m"
+                value={openAiDecisionNote}
+                onUpdate={setOpenAiDecisionNote}
+                placeholder="decision note (optional)"
+                disabled={openAiBusy}
+              />
+              <Button
+                view="action"
+                disabled={openAiBusy || openAiRecord.status !== "pending"}
+                data-testid="requester-openai-decide-approve"
+                onClick={() => void decideOpenAiInterruption("approve")}
+                title={openAiRecord.status !== "pending" ? "Decision is already recorded" : "Approve and complete linked task"}
+              >
+                Approve
+              </Button>
+              <Button
+                view="outlined-danger"
+                disabled={openAiBusy || openAiRecord.status !== "pending"}
+                data-testid="requester-openai-decide-reject"
+                onClick={() => void decideOpenAiInterruption("reject")}
+                title={openAiRecord.status !== "pending" ? "Decision is already recorded" : "Reject and complete linked task"}
+              >
+                Reject
+              </Button>
+              <Button
+                view="outlined"
+                disabled={openAiBusy || openAiRecord.status !== "decided"}
+                data-testid="requester-openai-resume"
+                onClick={() => void resumeOpenAiInterruption()}
+                title={openAiRecord.status !== "decided" ? "Resume requires a decided interruption" : "Generate resumable payload"}
+              >
+                Resume
+              </Button>
+            </div>
+            {openAiResume ? (
+              <div style={{ marginTop: 8 }}>
+                <p className="muted" style={{ margin: "0 0 6px 0" }}>Resume payload</p>
+                <pre className="json-code" data-testid="requester-openai-resume-payload">{prettyJson(openAiResume.resume_payload)}</pre>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </Card>
 
       <Card className="panel span-2" view="raised" data-testid="requester-packages">
