@@ -68,6 +68,7 @@ pytest -q
 - Deployment readiness report example: `docs/deployment-readiness-report-example.md`
 - Deploy handoff pack (read order): `docs/deploy-handoff-pack.md`
 - Lead capture landing (Gravity UI): `frontend/src/pages/LeadPage.tsx` (served at `/lead`)
+- Lead capture API: `POST /v1/leads` (public, see `docs/openapi-v0.yaml`)
 
 Fast backend checks (no docker):
 ```bash

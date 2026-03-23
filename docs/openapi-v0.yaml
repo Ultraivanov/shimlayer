@@ -13,6 +13,7 @@ tags:
   - name: Judgments
   - name: OpenAI
   - name: Billing
+  - name: Leads
   - name: System
   - name: Ops
   - name: Incidents
@@ -644,6 +645,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PackagePurchaseResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /v1/leads:
+    post:
+      tags: [Leads]
+      summary: Capture a waitlist lead
+      operationId: createLead
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLeadRequest"
+      responses:
+        "201":
+          description: Lead created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadRecord"
+        "204":
+          description: Accepted (spam trap triggered)
         "400":
           $ref: "#/components/responses/BadRequest"
 
@@ -1597,6 +1622,100 @@ components:
           type: number
         active:
           type: boolean
+
+    CreateLeadRequest:
+      type: object
+      required: [name, email, company]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        email:
+          type: string
+          minLength: 3
+          maxLength: 320
+        company:
+          type: string
+          minLength: 1
+          maxLength: 200
+        role:
+          type: string
+          maxLength: 200
+          nullable: true
+        volume:
+          type: string
+          maxLength: 50
+          nullable: true
+        timeline:
+          type: string
+          maxLength: 50
+          nullable: true
+        usecase:
+          type: string
+          maxLength: 2000
+          nullable: true
+        contact:
+          type: string
+          maxLength: 2000
+          nullable: true
+        source:
+          type: string
+          maxLength: 200
+          nullable: true
+        page:
+          type: string
+          maxLength: 200
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+        company_site:
+          type: string
+          maxLength: 200
+          nullable: true
+          description: Honeypot field; non-empty values are ignored
+
+    LeadRecord:
+      type: object
+      required: [id, name, email, company, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+        company:
+          type: string
+        role:
+          type: string
+          nullable: true
+        volume:
+          type: string
+          nullable: true
+        timeline:
+          type: string
+          nullable: true
+        usecase:
+          type: string
+          nullable: true
+        contact:
+          type: string
+          nullable: true
+        source:
+          type: string
+          nullable: true
+        page:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
 
     OpsMetricsResponse:
       type: object

@@ -67,6 +67,27 @@ create table if not exists public.accounts (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.leads (
+  id uuid primary key default uuid_generate_v4(),
+  name text not null,
+  email text not null,
+  company text not null,
+  role text,
+  volume text,
+  timeline text,
+  usecase text,
+  contact text,
+  source text,
+  page text,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_leads_created
+  on public.leads(created_at desc);
+create index if not exists idx_leads_email
+  on public.leads(email);
+
 alter table public.accounts
 add column if not exists flow_credits integer not null default 0;
 

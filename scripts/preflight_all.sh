@@ -8,6 +8,16 @@ RUN_DOCKER=0
 if [[ "${1:-}" == "--with-docker" ]]; then
   RUN_DOCKER=1
 fi
+RUN_STRICT=0
+if [[ "${1:-}" == "--strict" ]]; then
+  RUN_STRICT=1
+fi
+
+if [[ "$RUN_STRICT" -eq 1 ]]; then
+  echo "==> preflight strict"
+  ./scripts/preflight_strict.sh
+  exit 0
+fi
 
 echo "==> preflight fast"
 ./scripts/preflight_fast.sh

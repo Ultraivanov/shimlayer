@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="390" height="844" viewBox="0 0 390 844" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="390" height="844" fill="#0F1115"/>
+  <ellipse cx="90" cy="10" rx="160" ry="90" fill="#1A3A2E" opacity="0.45"/>
+  <ellipse cx="360" cy="40" rx="140" ry="80" fill="#1C2842" opacity="0.5"/>
+
+  <rect x="20" y="24" width="350" height="796" rx="20" fill="#121826" stroke="#2A3240"/>
+  <rect x="36" y="44" width="170" height="28" rx="14" fill="#16362E" stroke="#2A7F64"/>
+  <text x="48" y="63" font-family="Arial" font-size="11" fill="#7CF3C7">Ранний доступ · вайтлист</text>
+
+  <text x="36" y="120" font-family="Arial" font-size="22" fill="#F2F4F8">Возвращайте агентные</text>
+  <text x="36" y="148" font-family="Arial" font-size="22" fill="#F2F4F8">сбои за минуты.</text>
+  <text x="36" y="176" font-family="Arial" font-size="12" fill="#A5B0C3">ShimLayer превращает прерывания OpenAI</text>
+  <text x="36" y="194" font-family="Arial" font-size="12" fill="#A5B0C3">в решения с proof и аудитом.</text>
+
+  <rect x="36" y="214" width="150" height="38" rx="10" fill="#7CF3C7"/>
+  <text x="46" y="239" font-family="Arial" font-size="12" fill="#0D1117">Войти в вайтлист</text>
+  <rect x="196" y="214" width="140" height="38" rx="10" fill="none" stroke="#2A3240"/>
+  <text x="208" y="239" font-family="Arial" font-size="12" fill="#E6EAF2">Посмотреть</text>
+
+  <rect x="36" y="268" width="318" height="90" rx="14" fill="#151A23" stroke="#2A3240"/>
+  <text x="48" y="298" font-family="Arial" font-size="12" fill="#9AA4B2">SLA решений • Proof • Manual review</text>
+  <text x="48" y="320" font-family="Arial" font-size="12" fill="#9AA4B2">Audit trail • Push + pull delivery</text>
+
+  <rect x="36" y="376" width="318" height="150" rx="16" fill="#151A23" stroke="#2A3240"/>
+  <text x="48" y="402" font-family="Arial" font-size="14" fill="#F2F4F8">Что вы получаете</text>
+  <text x="48" y="426" font-family="Arial" font-size="12" fill="#E6EAF2">Approve/Reject для прерываний</text>
+  <text x="48" y="446" font-family="Arial" font-size="12" fill="#E6EAF2">Proof‑артефакты и заметки</text>
+  <text x="48" y="466" font-family="Arial" font-size="12" fill="#E6EAF2">Push + pull доставка</text>
+  <text x="48" y="486" font-family="Arial" font-size="12" fill="#E6EAF2">Ops: очереди, lock’и, audits</text>
+
+  <rect x="36" y="544" width="318" height="220" rx="16" fill="#151A23" stroke="#2A3240"/>
+  <text x="48" y="570" font-family="Arial" font-size="16" fill="#F2F4F8">Войти в вайтлист</text>
+  <text x="48" y="590" font-family="Arial" font-size="12" fill="#9AA4B2">Ответим в течение 2 рабочих дней.</text>
+
+  <rect x="48" y="608" width="294" height="34" rx="8" fill="#0F131A" stroke="#2A3240"/>
+  <text x="58" y="630" font-family="Arial" font-size="11" fill="#9AA4B2">Имя</text>
+  <rect x="48" y="650" width="294" height="34" rx="8" fill="#0F131A" stroke="#2A3240"/>
+  <text x="58" y="672" font-family="Arial" font-size="11" fill="#9AA4B2">Рабочий email</text>
+  <rect x="48" y="692" width="294" height="34" rx="8" fill="#0F131A" stroke="#2A3240"/>
+  <text x="58" y="714" font-family="Arial" font-size="11" fill="#9AA4B2">Компания</text>
+
+  <rect x="48" y="734" width="200" height="34" rx="10" fill="#7CF3C7"/>
+  <text x="60" y="756" font-family="Arial" font-size="12" fill="#0D1117">Войти в вайтлист</text>
+</svg>

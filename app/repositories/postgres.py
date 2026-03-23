@@ -13,6 +13,8 @@ from app.models import (
     CreateOpsIncidentRequest,
     CreateArtifactRequest,
     CreateTaskRequest,
+    CreateLeadRequest,
+    LeadRecord,
     OpsMetricsResponse,
     OpsIncident,
     OpsIncidentEvent,
@@ -308,6 +310,52 @@ class PostgresRepository:
                     (account_id, entry_type, amount_usd, reference, Json(meta or {})),
                 )
             conn.commit()
+
+    def create_lead(self, payload: CreateLeadRequest) -> LeadRecord:
+        lead_id = uuid4()
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    insert into public.leads
+                    (id, name, email, company, role, volume, timeline, usecase, contact, source, page, metadata)
+                    values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    returning id, name, email, company, role, volume, timeline, usecase, contact, source, page, metadata, created_at
+                    """,
+                    (
+                        lead_id,
+                        payload.name,
+                        payload.email,
+                        payload.company,
+                        payload.role,
+                        payload.volume,
+                        payload.timeline,
+                        payload.usecase,
+                        payload.contact,
+                        payload.source,
+                        payload.page,
+                        Json(payload.metadata or {}),
+                    ),
+                )
+                row = cur.fetchone()
+            conn.commit()
+        if not row:
+            raise ValueError("Failed to insert lead")
+        return LeadRecord(
+            id=row["id"],
+            name=row["name"],
+            email=row["email"],
+            company=row["company"],
+            role=row.get("role"),
+            volume=row.get("volume"),
+            timeline=row.get("timeline"),
+            usecase=row.get("usecase"),
+            contact=row.get("contact"),
+            source=row.get("source"),
+            page=row.get("page"),
+            metadata=row.get("metadata") or {},
+            created_at=row["created_at"],
+        )
 
     def create_task(self, api_key: str, payload: CreateTaskRequest) -> Task:
         with self._conn() as conn:

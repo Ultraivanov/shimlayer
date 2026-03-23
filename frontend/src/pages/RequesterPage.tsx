@@ -1337,6 +1337,7 @@ export function RequesterPage({ pushTask }: Props) {
             value={taskLookupId}
             onUpdate={setTaskLookupId}
             placeholder="Open by Task ID"
+            title="Paste the UUID from webhook payloads or interruption context."
             disabled={taskLookupBusy}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -1378,6 +1379,9 @@ export function RequesterPage({ pushTask }: Props) {
             Demo
           </Button>
         </div>
+        <p className="muted" style={{ marginTop: 6 }}>
+          Tip: “Open by Task ID” jumps directly to a task from webhook payloads or interruptions. Auto-refresh pauses on repeated errors — hit “Resume” to recover.
+        </p>
         {showDemo ? (
           <div className="row-tight" style={{ alignItems: "center", flexWrap: "wrap" }}>
             <span className="chip chip-muted">demo</span>

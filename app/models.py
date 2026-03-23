@@ -100,6 +100,37 @@ class PackageInfo(BaseModel):
     active: bool = True
 
 
+class CreateLeadRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    email: str = Field(min_length=3, max_length=320)
+    company: str = Field(min_length=1, max_length=200)
+    role: str | None = Field(default=None, max_length=200)
+    volume: str | None = Field(default=None, max_length=50)
+    timeline: str | None = Field(default=None, max_length=50)
+    usecase: str | None = Field(default=None, max_length=2000)
+    contact: str | None = Field(default=None, max_length=2000)
+    source: str | None = Field(default=None, max_length=200)
+    page: str | None = Field(default=None, max_length=200)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    company_site: str | None = Field(default=None, max_length=200)
+
+
+class LeadRecord(BaseModel):
+    id: UUID
+    name: str
+    email: str
+    company: str
+    role: str | None = None
+    volume: str | None = None
+    timeline: str | None = None
+    usecase: str | None = None
+    contact: str | None = None
+    source: str | None = None
+    page: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+
+
 class Artifact(BaseModel):
     id: UUID
     task_id: UUID

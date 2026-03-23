@@ -27,6 +27,7 @@ Tip: enforce this in CI by running `SHIMLAYER_STRICT_UI_SMOKE=1 ./scripts/prefli
 Expected: all internal steps pass.
 Tip: enforce Docker availability by running `SHIMLAYER_STRICT_DOCKER=1 ./scripts/preflight_local.sh`.
 Tip: for a single strict gate, run `./scripts/preflight_strict.sh`.
+Tip: `./scripts/preflight_all.sh --strict` is equivalent to running the strict gate.
 
 ## 5. API readiness + observability probes
 ```bash

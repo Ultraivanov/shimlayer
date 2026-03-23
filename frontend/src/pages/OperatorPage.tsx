@@ -728,6 +728,9 @@ export function OperatorPage() {
             Open
           </Button>
         </div>
+        <p className="muted" style={{ marginTop: 6 }}>
+          Tip: use “Open by Task ID” when you receive a customer-reported UUID or an OpenAI interruption task.
+        </p>
         <div className="row-tight">
           <Select
             width="max"

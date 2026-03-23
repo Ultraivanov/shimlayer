@@ -17,7 +17,9 @@ import type {
   TaskWithReview,
   TaskSyncResponse,
   OpenAIInterruptionRecord,
-  OpenAIResumeResponse
+  OpenAIResumeResponse,
+  LeadCreateRequest,
+  LeadRecord
 } from "./types";
 
 type Config = {
@@ -96,6 +98,8 @@ function parseDispositionFilename(value: string | null): string | null {
 
 export const Api = {
   listPackages: () => http<PackageInfo[]>("/v1/billing/packages"),
+  createLead: (payload: LeadCreateRequest) =>
+    http<LeadRecord>("/v1/leads", { method: "POST", body: JSON.stringify(payload) }),
   purchasePackage: (packageCode: string, reference: string) =>
     http("/v1/billing/packages/purchase", {
       method: "POST",

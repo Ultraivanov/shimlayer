@@ -23,6 +23,7 @@ from app.models import (
     CompleteTaskRequest,
     CreateArtifactRequest,
     UploadArtifactRequest,
+    CreateLeadRequest,
     CreateOpsIncidentRequest,
     StripeCheckoutSessionRequest,
     StripeCheckoutSessionResponse,
@@ -47,6 +48,7 @@ from app.models import (
     OpenAIInterruptionRecord,
     OpenAIResumeResponse,
     PackageInfo,
+    LeadRecord,
     PackagePurchaseRequest,
     PackagePurchaseResponse,
     StuckRecoveryResult,
@@ -1002,6 +1004,27 @@ def create_stripe_checkout_session(
     api_key: str = Depends(require_api_key),
 ) -> StripeCheckoutSessionResponse:
     return _build_checkout_session(payload=payload, api_key=api_key)
+
+
+@router.post("/leads", response_model=LeadRecord, status_code=status.HTTP_201_CREATED)
+def create_lead(
+    payload: CreateLeadRequest,
+    request: Request,
+    repo: Repository = Depends(get_repo),
+) -> LeadRecord | Response:
+    if payload.company_site and payload.company_site.strip():
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    metadata = dict(payload.metadata or {})
+    if request.client and request.client.host and "remote_ip" not in metadata:
+        metadata["remote_ip"] = request.client.host
+    user_agent = request.headers.get("user-agent")
+    if user_agent and "user_agent" not in metadata:
+        metadata["user_agent"] = user_agent
+    referer = request.headers.get("referer")
+    if referer and "referer" not in metadata:
+        metadata["referer"] = referer
+    payload = payload.model_copy(update={"metadata": metadata})
+    return repo.create_lead(payload)
 
 
 @router.get("/healthz")

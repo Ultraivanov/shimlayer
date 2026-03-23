@@ -28,6 +28,8 @@ from app.models import (
     WebhookDeadLetter,
     WebhookDelivery,
     OpsMetricsResponse,
+    CreateLeadRequest,
+    LeadRecord,
 )
 
 
@@ -58,6 +60,7 @@ class Repository(Protocol):
         reference: str,
         meta: dict | None = None,
     ) -> None: ...
+    def create_lead(self, payload: CreateLeadRequest) -> LeadRecord: ...
 
     def create_task(self, api_key: str, payload: CreateTaskRequest) -> Task: ...
     def list_account_tasks_with_review(

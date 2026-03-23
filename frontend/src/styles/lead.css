@@ -16,6 +16,60 @@
   align-items: center;
 }
 
+.lead-proof {
+  max-width: 1100px;
+  margin: 0 auto 32px;
+  display: grid;
+  grid-template-columns: 1.3fr 0.7fr;
+  gap: 18px;
+  align-items: center;
+  background: #151a23;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 20px 22px;
+}
+
+.lead-proof-head h3 {
+  margin: 0 0 6px;
+}
+
+.lead-proof-head p {
+  margin: 0;
+  color: #a5b0c3;
+}
+
+.lead-logos {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.logo-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #c7d0de;
+  font-size: 12px;
+}
+
+.lead-quote {
+  grid-column: 1 / -1;
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #c7d0de;
+  font-size: 14px;
+}
+
+.lead-quote span {
+  color: #9aa4b2;
+  font-size: 12px;
+}
+
 .lead-hero-copy h1 {
   font-size: 44px;
   line-height: 1.05;
@@ -133,11 +187,37 @@
   flex-wrap: wrap;
 }
 
+.lead-success {
+  margin-top: 12px;
+  color: #7cf3c7;
+  font-weight: 600;
+}
+
+.lead-error {
+  margin-top: 12px;
+  color: #ff9da5;
+}
+
+.lead-honeypot {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
 @media (max-width: 980px) {
   .lead-hero,
   .lead-grid,
-  .lead-flow {
+  .lead-flow,
+  .lead-proof {
     grid-template-columns: 1fr;
+  }
+  .lead-logos {
+    justify-content: flex-start;
+  }
+  .lead-quote {
+    flex-direction: column;
   }
   .lead-hero-copy h1 {
     font-size: 36px;

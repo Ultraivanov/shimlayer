@@ -10,6 +10,8 @@ from app.models import (
     CreateOpsIncidentRequest,
     CreateArtifactRequest,
     CreateTaskRequest,
+    CreateLeadRequest,
+    LeadRecord,
     OpsMetricsResponse,
     OpsIncidentEvent,
     OpsMarginSummary,
@@ -64,6 +66,7 @@ class InMemoryRepository:
         self._api_key_by_stripe_customer: dict[str, str] = {}
         self._stripe_subscriptions: dict[str, dict] = {}
         self._openai_interruptions: dict[str, OpenAIInterruptionRecord] = {}
+        self._leads: list[LeadRecord] = []
 
     @staticmethod
     def _enum_or_str(value: object) -> str:
@@ -234,6 +237,26 @@ class InMemoryRepository:
                 }
             )
             _ = flow_credits
+
+    def create_lead(self, payload: CreateLeadRequest) -> LeadRecord:
+        with self._lock:
+            lead = LeadRecord(
+                id=uuid4(),
+                name=payload.name,
+                email=payload.email,
+                company=payload.company,
+                role=payload.role,
+                volume=payload.volume,
+                timeline=payload.timeline,
+                usecase=payload.usecase,
+                contact=payload.contact,
+                source=payload.source,
+                page=payload.page,
+                metadata=payload.metadata or {},
+                created_at=utcnow(),
+            )
+            self._leads.append(lead)
+            return lead
 
     def create_task(self, api_key: str, payload: CreateTaskRequest) -> Task:
         with self._lock:

@@ -6,6 +6,37 @@ export type PackageInfo = {
   active: boolean;
 };
 
+export type LeadCreateRequest = {
+  name: string;
+  email: string;
+  company: string;
+  role?: string | null;
+  volume?: string | null;
+  timeline?: string | null;
+  usecase?: string | null;
+  contact?: string | null;
+  source?: string | null;
+  page?: string | null;
+  metadata?: Record<string, unknown>;
+  company_site?: string | null;
+};
+
+export type LeadRecord = {
+  id: string;
+  name: string;
+  email: string;
+  company: string;
+  role?: string | null;
+  volume?: string | null;
+  timeline?: string | null;
+  usecase?: string | null;
+  contact?: string | null;
+  source?: string | null;
+  page?: string | null;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+};
+
 export type BalanceResponse = {
   account_id: string;
   balance_usd: number;

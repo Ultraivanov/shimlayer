@@ -28,13 +28,23 @@ if python3 -c "import pytest" >/dev/null 2>&1; then
   run_step "pytest webhooks+stripe" python3 -m pytest -q tests/test_webhook_worker.py tests/test_webhook_dispatcher.py tests/test_stripe_signature.py tests/test_stripe_webhook.py
   run_step "pytest openai resume worker e2e" python3 -m pytest -q tests/test_openai_resume_worker_e2e.py
 else
-  echo "SKIP: pytest module not installed"
+  if [[ "${SHIMLAYER_STRICT_DEPS:-0}" == "1" ]]; then
+    echo "FAIL: pytest module not installed (strict deps enabled)"
+    failures=$((failures + 1))
+  else
+    echo "SKIP: pytest module not installed"
+  fi
 fi
 
 if command -v npm >/dev/null 2>&1; then
   run_step "frontend build" npm --prefix frontend run build
 else
-  echo "SKIP: npm not found"
+  if [[ "${SHIMLAYER_STRICT_DEPS:-0}" == "1" ]]; then
+    echo "FAIL: npm not found (strict deps enabled)"
+    failures=$((failures + 1))
+  else
+    echo "SKIP: npm not found"
+  fi
 fi
 
 if [[ "$failures" -gt 0 ]]; then
