@@ -486,7 +486,12 @@ export function RequesterPage({ pushTask }: Props) {
   function recordAutoRefreshFailure(err: unknown) {
     setAutoRefreshFailureCount((c) => {
       const next = c + 1;
-      setAutoRefreshPausedUntilMs(Date.now() + autoBackoffMs(next));
+      const pauseMs = autoBackoffMs(next);
+      setAutoRefreshPausedUntilMs(Date.now() + pauseMs);
+      if (c === 0) {
+        const pauseSeconds = Math.round(pauseMs / 1000);
+        pushToast("error", `Auto-refresh failed; pausing for ${pauseSeconds}s`);
+      }
       return next;
     });
     setAutoRefreshLastError(err instanceof Error ? err.message : String(err));
@@ -1331,13 +1336,15 @@ export function RequesterPage({ pushTask }: Props) {
               : isPageVisible
                 ? ""
                 : "(paused)"}
+            {autoRefreshSeconds !== 0 && autoRefreshPausedUntilMs > nowMs && autoRefreshLastError
+              ? ` · ${autoRefreshLastError}`
+              : ""}
           </span>
           <TextInput
             size="m"
             value={taskLookupId}
             onUpdate={setTaskLookupId}
             placeholder="Open by Task ID"
-            title="Paste the UUID from webhook payloads or interruption context."
             disabled={taskLookupBusy}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -1765,9 +1772,12 @@ export function RequesterPage({ pushTask }: Props) {
                     <span className={`chip ${hasQualityProof ? "chip-ok" : "chip-warn"}`} title={hasQualityProof ? "Quality proof is present" : "Completion is blocked: add quality proof"}>
                       proof {hasQualityProof ? "quality" : "missing"}
                     </span>
-                    <span className="muted mono">artifacts {selectedTask.artifacts?.length ?? 0}</span>
-                  </span>
+                  <span className="muted mono">artifacts {selectedTask.artifacts?.length ?? 0}</span>
+                </span>
 	              </div>
+                <p className="muted" style={{ marginTop: 6 }}>
+                  Quality proof = local upload or a valid <span className="mono">checksum_sha256</span>. Completion is blocked until it’s present.
+                </p>
 
 	              {artifactsMode === "register" ? (
 	                <div className="detail-block">
