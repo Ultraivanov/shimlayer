@@ -107,5 +107,4 @@ npm run e2e
 ```
 
 ## Remaining Work (Optional Next Iteration)
-- Add lightweight E2E UI smoke (Playwright/Cypress) for critical ops flows.
 - Add server-side trend storage (instead of local snapshots) for cross-device continuity.
