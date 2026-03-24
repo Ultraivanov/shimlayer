@@ -33,6 +33,7 @@ from app.models import (
     OpsBulkActionItem,
     OpsBulkActionRequest,
     OpsBulkActionResponse,
+    OpsMetricsHistoryPoint,
     OpsMetricsResponse,
     OpsIncident,
     OpsIncidentEvent,
@@ -1182,7 +1183,21 @@ def ops_metrics(
     repo: Repository = Depends(get_repo),
 ) -> OpsMetricsResponse:
     _ = (api_key, admin_key, admin_ctx)
-    return repo.get_ops_metrics()
+    metrics = repo.get_ops_metrics()
+    repo.record_ops_metrics_sample(metrics)
+    return metrics
+
+
+@router.get("/ops/metrics/history", response_model=list[OpsMetricsHistoryPoint])
+def ops_metrics_history(
+    limit: int = 48,
+    api_key: str = Depends(require_api_key),
+    admin_key: str = Depends(require_admin_key),
+    admin_ctx: AdminContext = Depends(require_admin_context),
+    repo: Repository = Depends(get_repo),
+) -> list[OpsMetricsHistoryPoint]:
+    _ = (api_key, admin_key, admin_ctx)
+    return repo.get_ops_metrics_history(limit=limit)
 
 
 @router.get("/ops/dlq", response_model=list[WebhookDeadLetter])

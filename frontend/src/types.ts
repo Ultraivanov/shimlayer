@@ -73,6 +73,14 @@ export type OpsMetrics = {
   task_status_counts: Record<string, number>;
 };
 
+export type OpsMetricsHistoryPoint = {
+  at: string;
+  tasks_overdue: number;
+  tasks_sla_risk: number;
+  webhook_dlq_count: number;
+  webhook_retry_rate: number;
+};
+
 export type DeadLetter = {
   id: string;
   webhook_job_id: string;

@@ -12,6 +12,7 @@ from app.models import (
     CreateTaskRequest,
     CreateLeadRequest,
     LeadRecord,
+    OpsMetricsHistoryPoint,
     OpsMetricsResponse,
     OpsIncidentEvent,
     OpsMarginSummary,
@@ -67,6 +68,7 @@ class InMemoryRepository:
         self._stripe_subscriptions: dict[str, dict] = {}
         self._openai_interruptions: dict[str, OpenAIInterruptionRecord] = {}
         self._leads: list[LeadRecord] = []
+        self._ops_metrics_history: list[OpsMetricsHistoryPoint] = []
 
     @staticmethod
     def _enum_or_str(value: object) -> str:
@@ -920,6 +922,30 @@ class InMemoryRepository:
                 tasks_overdue=tasks_overdue,
                 task_status_counts=status_counts,
             )
+
+    def record_ops_metrics_sample(self, metrics: OpsMetricsResponse, min_interval_seconds: int = 60) -> bool:
+        with self._lock:
+            now = utcnow()
+            if self._ops_metrics_history:
+                last = self._ops_metrics_history[-1]
+                if (now - last.at).total_seconds() < min_interval_seconds:
+                    return False
+            point = OpsMetricsHistoryPoint(
+                at=now,
+                tasks_overdue=metrics.tasks_overdue,
+                tasks_sla_risk=metrics.tasks_sla_risk,
+                webhook_dlq_count=metrics.webhook_dlq_count,
+                webhook_retry_rate=metrics.webhook_retry_rate,
+            )
+            self._ops_metrics_history.append(point)
+            if len(self._ops_metrics_history) > 2000:
+                self._ops_metrics_history = self._ops_metrics_history[-2000:]
+            return True
+
+    def get_ops_metrics_history(self, limit: int = 48) -> list[OpsMetricsHistoryPoint]:
+        capped_limit = max(1, min(limit, 500))
+        with self._lock:
+            return list(self._ops_metrics_history)[-capped_limit:]
 
     def list_webhook_dead_letters(self, limit: int = 50) -> list[WebhookDeadLetter]:
         with self._lock:

@@ -8,6 +8,7 @@ import type {
   OpsIncident,
   OpsMarginSummary,
   OpsMetrics,
+  OpsMetricsHistoryPoint,
   OpsObservability,
   Task,
   TaskAuditEntry,
@@ -56,15 +57,6 @@ type SavedView = {
   pageSize: number;
   flowQueueView: FlowQueueViewMode;
 };
-type MetricsHistoryPoint = {
-  at: string;
-  tasks_overdue: number;
-  tasks_sla_risk: number;
-  webhook_dlq_count: number;
-  webhook_retry_rate: number;
-};
-
-const METRICS_HISTORY_KEY = "ops.metricsHistory.v1";
 const SAVED_VIEWS_KEY = "ops.savedViews.v1";
 
 type BulkResult = { task_id: string; ok: boolean; error?: string };
@@ -130,17 +122,6 @@ function csvCell(value: unknown): string {
   return `"${s.replace(/\"/g, "\"\"")}"`;
 }
 
-function loadMetricsHistory(): MetricsHistoryPoint[] {
-  try {
-    const raw = localStorage.getItem(METRICS_HISTORY_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as MetricsHistoryPoint[];
-    if (!Array.isArray(parsed)) return [];
-    return parsed.slice(-48);
-  } catch {
-    return [];
-  }
-}
 
 function loadSavedViews(): SavedView[] {
   try {
@@ -253,7 +234,7 @@ export function OpsPage() {
   const [savedViews, setSavedViews] = useState<SavedView[]>(() => loadSavedViews());
   const [newSavedViewName, setNewSavedViewName] = useState("");
   const [inspectorTab, setInspectorTab] = useState<FlowInspectorTab>("summary");
-  const [metricsHistory, setMetricsHistory] = useState<MetricsHistoryPoint[]>(() => loadMetricsHistory());
+  const [metricsHistory, setMetricsHistory] = useState<OpsMetricsHistoryPoint[]>([]);
   const [trendWindow, setTrendWindow] = useState<TrendWindow>(
     () => Number(localStorage.getItem("ops.trendWindow") ?? "12") as TrendWindow
   );
@@ -707,22 +688,6 @@ export function OpsPage() {
     manualQueuePausedUntilMsRef.current = manualQueuePausedUntilMs;
   }, [manualQueuePausedUntilMs]);
 
-  useEffect(() => {
-    if (!metrics) return;
-    setMetricsHistory((prev) => {
-      const point: MetricsHistoryPoint = {
-        at: new Date().toISOString(),
-        tasks_overdue: metrics.tasks_overdue,
-        tasks_sla_risk: metrics.tasks_sla_risk,
-        webhook_dlq_count: metrics.webhook_dlq_count,
-        webhook_retry_rate: metrics.webhook_retry_rate
-      };
-      const next = [...prev, point].slice(-48);
-      localStorage.setItem(METRICS_HISTORY_KEY, JSON.stringify(next));
-      return next;
-    });
-  }, [metrics]);
-
   async function claimAndSelectFlow(taskId: string) {
     if (!showManualReviewQueue) {
       setSelectedFlowId(taskId);
@@ -1001,6 +966,10 @@ export function OpsPage() {
           .then(setMetrics)
           .then(() => null)
           .catch((e) => `metrics: ${String(e)}`),
+        Api.getOpsMetricsHistory(48)
+          .then(setMetricsHistory)
+          .then(() => null)
+          .catch((e) => `metrics history: ${String(e)}`),
         Api.getOpsObservability()
           .then(setObservability)
           .then(() => null)

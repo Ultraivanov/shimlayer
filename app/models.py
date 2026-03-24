@@ -221,6 +221,14 @@ class OpsMetricsResponse(BaseModel):
     task_status_counts: dict[str, int] = Field(default_factory=dict)
 
 
+class OpsMetricsHistoryPoint(BaseModel):
+    at: datetime
+    tasks_overdue: int
+    tasks_sla_risk: int
+    webhook_dlq_count: int
+    webhook_retry_rate: float
+
+
 class WebhookDeadLetter(BaseModel):
     id: UUID
     webhook_job_id: UUID

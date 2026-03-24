@@ -277,6 +277,18 @@ create table if not exists public.ops_task_audit (
 create index if not exists idx_ops_task_audit_task_created
   on public.ops_task_audit(task_id, created_at desc);
 
+create table if not exists public.ops_metrics_history (
+  id uuid primary key default uuid_generate_v4(),
+  at timestamptz not null default now(),
+  tasks_overdue integer not null default 0,
+  tasks_sla_risk integer not null default 0,
+  webhook_dlq_count integer not null default 0,
+  webhook_retry_rate numeric(8,4) not null default 0
+);
+
+create index if not exists idx_ops_metrics_history_at
+  on public.ops_metrics_history(at desc);
+
 create table if not exists public.ops_incidents (
   id uuid primary key default uuid_generate_v4(),
   incident_type text not null,

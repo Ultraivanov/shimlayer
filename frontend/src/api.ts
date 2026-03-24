@@ -7,6 +7,7 @@ import type {
   OpsBulkActionResponse,
   OpsTimelineEvent,
   OpsMetrics,
+  OpsMetricsHistoryPoint,
   OpsObservability,
   OpsMarginSummary,
   OpsIncidentEvent,
@@ -235,6 +236,8 @@ export const Api = {
   resumeOpenAIInterruption: (interruptionId: string) =>
     http<OpenAIResumeResponse>(`/v1/openai/interruptions/${encodeURIComponent(interruptionId)}/resume`, { method: "POST" }),
   getOpsMetrics: () => http<OpsMetrics>("/v1/ops/metrics", {}, true),
+  getOpsMetricsHistory: (limit = 48) =>
+    http<OpsMetricsHistoryPoint[]>(`/v1/ops/metrics/history?limit=${limit}`, {}, true),
   getDlq: (limit = 20) => http<DeadLetter[]>(`/v1/ops/dlq?limit=${limit}`, {}, true),
   getOpsManualReviewQueue: (params: { limit?: number; status?: string; taskType?: string; includeLocked?: boolean } = {}) => {
     const q = new URLSearchParams();

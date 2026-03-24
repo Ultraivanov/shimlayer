@@ -16,6 +16,7 @@ from app.models import (
     CreateLeadRequest,
     LeadRecord,
     OpsMetricsResponse,
+    OpsMetricsHistoryPoint,
     OpsIncident,
     OpsIncidentEvent,
     Review,
@@ -1644,6 +1645,73 @@ class PostgresRepository:
             tasks_overdue=int(task_health["tasks_overdue"] or 0),
             task_status_counts=status_counts,
         )
+
+    def record_ops_metrics_sample(self, metrics: OpsMetricsResponse, min_interval_seconds: int = 60) -> bool:
+        now = utcnow()
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    select at
+                    from public.ops_metrics_history
+                    order by at desc
+                    limit 1
+                    """
+                )
+                row = cur.fetchone()
+                if row:
+                    last_at = row["at"]
+                    if last_at and (now - last_at).total_seconds() < min_interval_seconds:
+                        conn.commit()
+                        return False
+                cur.execute(
+                    """
+                    insert into public.ops_metrics_history (
+                      at,
+                      tasks_overdue,
+                      tasks_sla_risk,
+                      webhook_dlq_count,
+                      webhook_retry_rate
+                    )
+                    values (%s, %s, %s, %s, %s)
+                    """,
+                    (
+                        now,
+                        metrics.tasks_overdue,
+                        metrics.tasks_sla_risk,
+                        metrics.webhook_dlq_count,
+                        metrics.webhook_retry_rate,
+                    ),
+                )
+            conn.commit()
+        return True
+
+    def get_ops_metrics_history(self, limit: int = 48) -> list[OpsMetricsHistoryPoint]:
+        capped_limit = max(1, min(limit, 500))
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    select at, tasks_overdue, tasks_sla_risk, webhook_dlq_count, webhook_retry_rate
+                    from public.ops_metrics_history
+                    order by at desc
+                    limit %s
+                    """,
+                    (capped_limit,),
+                )
+                rows = cur.fetchall() or []
+            conn.commit()
+        rows.reverse()
+        return [
+            OpsMetricsHistoryPoint(
+                at=row["at"],
+                tasks_overdue=int(row["tasks_overdue"] or 0),
+                tasks_sla_risk=int(row["tasks_sla_risk"] or 0),
+                webhook_dlq_count=int(row["webhook_dlq_count"] or 0),
+                webhook_retry_rate=float(row["webhook_retry_rate"] or 0.0),
+            )
+            for row in rows
+        ]
 
     def list_webhook_dead_letters(self, limit: int = 50) -> list[WebhookDeadLetter]:
         capped_limit = max(1, min(limit, 500))

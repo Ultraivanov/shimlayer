@@ -691,6 +691,35 @@ paths:
         "403":
           description: Forbidden
 
+  /v1/ops/metrics/history:
+    get:
+      tags: [Ops]
+      summary: Get recent operational metrics history
+      operationId: getOpsMetricsHistory
+      parameters:
+        - $ref: "#/components/parameters/AdminKey"
+        - $ref: "#/components/parameters/AdminRole"
+        - $ref: "#/components/parameters/AdminUser"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 48
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: Metrics history returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OpsMetricsHistoryPoint"
+        "403":
+          description: Forbidden
+
   /v1/ops/dlq:
     get:
       tags: [Ops]
@@ -1741,6 +1770,22 @@ components:
         task_resolution_p95_seconds:
           type: number
           nullable: true
+
+    OpsMetricsHistoryPoint:
+      type: object
+      required: [at, tasks_overdue, tasks_sla_risk, webhook_dlq_count, webhook_retry_rate]
+      properties:
+        at:
+          type: string
+          format: date-time
+        tasks_overdue:
+          type: integer
+        tasks_sla_risk:
+          type: integer
+        webhook_dlq_count:
+          type: integer
+        webhook_retry_rate:
+          type: number
 
     WebhookDelivery:
       type: object
