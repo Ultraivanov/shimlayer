@@ -107,4 +107,4 @@ npm run e2e
 ```
 
 ## Remaining Work (Optional Next Iteration)
-- Add server-side trend storage (instead of local snapshots) for cross-device continuity.
+- None at the moment.
