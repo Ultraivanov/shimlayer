@@ -1629,13 +1629,20 @@ export function RequesterPage({ pushTask }: Props) {
                   )}
                   {" "}
                   <Button size="s" view="flat" onClick={() => setWebhookAttemptsOpen((v) => !v)}>
-                    {webhookAttemptsOpen ? "Hide attempts" : "Show attempts"}
+                    {webhookAttemptsOpen
+                      ? `Hide attempts${webhookDeliveries.length ? ` (${webhookDeliveries.length})` : ""}`
+                      : `Show attempts${webhookDeliveries.length ? ` (${webhookDeliveries.length})` : ""}`}
                   </Button>
                 </p>
               ) : null}
               {selectedTask.callback_url && webhookAttemptsOpen ? (
                 <div className="list" style={{ marginTop: 8 }}>
                   {webhookDeliveries.length === 0 ? <p className="muted">Open details to load attempts.</p> : null}
+                  {webhookDeliveries.length > 0 ? (
+                    <p className="muted mono" style={{ marginTop: 0 }}>
+                      attempts loaded: {webhookDeliveries.length}
+                    </p>
+                  ) : null}
                   {webhookDeliveries.map((d) => (
                     <div key={d.id} className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
                       <span className="mono">
