@@ -376,6 +376,7 @@ test.describe("Ops smoke", () => {
     const bulkDlBtn = page.locator('[data-testid="ops-download-selected-bundles"]');
     await expect(bulkDlBtn).toBeVisible();
     await expect(bulkDlBtn).toBeDisabled();
+    await expect(page.locator('[data-testid="ops-download-helper"]')).toContainText("Download as one zip");
 
     // Select 2 flows
     const rowA = page.locator(`[data-testid="ops-flow-row"][data-task-id="${taskA}"]`);

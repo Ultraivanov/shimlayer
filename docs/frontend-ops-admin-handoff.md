@@ -37,6 +37,8 @@
   - loading/empty states across major panels
   - keyboard triage shortcuts (`J/K`, `A`, `R`, `D`)
   - auto-refresh (`off/15/30/60s`) with pause on hidden tab
+  - manual queue auto-refresh status shows pause/errors + last OK time
+  - bulk download helper text + selection count + clear selection
   - Gravity UI confirm dialog for destructive/sensitive actions (single + bulk)
   - action consistency polish:
     - single-action buttons have aligned loading/disabled behavior
@@ -64,7 +66,14 @@
    - resolve
    - open events and confirm event timeline renders
 9. Requeue one DLQ item and verify toast + state update.
-10. Validate keyboard shortcuts:
+10. Bulk download:
+    - select 2+ flows and download bundles
+    - verify confirm prompt for 10+ selections
+    - use `Download as one zip` for a single archive
+11. Webhook deliveries:
+    - toggle attempts list and see attempts count
+    - click `Resend now` and confirm last attempt updates
+12. Validate keyboard shortcuts:
     - `J/K` moves selection
     - `A/R/D` run expected actions (with confirm where required)
     - no shortcut triggers while typing inside inputs/textareas.

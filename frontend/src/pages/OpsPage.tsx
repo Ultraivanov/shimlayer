@@ -271,6 +271,7 @@ export function OpsPage() {
   const [manualQueuePausedUntilMs, setManualQueuePausedUntilMs] = useState<number>(0);
   const [manualQueueFailureCount, setManualQueueFailureCount] = useState<number>(0);
   const [manualQueueLastError, setManualQueueLastError] = useState<string>("");
+  const [manualQueueLastOkAtMs, setManualQueueLastOkAtMs] = useState<number>(0);
   const [isPageVisible, setIsPageVisible] = useState<boolean>(() => document.visibilityState === "visible");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isActionRunning, setIsActionRunning] = useState(false);
@@ -646,6 +647,13 @@ export function OpsPage() {
     setManualQueuePausedUntilMs(0);
     setManualQueueFailureCount(0);
     setManualQueueLastError("");
+  }
+
+  function recordManualQueueAutoRefreshSuccess() {
+    if (manualQueueFailureCount !== 0) setManualQueueFailureCount(0);
+    if (manualQueuePausedUntilMs !== 0) setManualQueuePausedUntilMs(0);
+    if (manualQueueLastError) setManualQueueLastError("");
+    setManualQueueLastOkAtMs(Date.now());
   }
 
   useEffect(() => {
@@ -1068,7 +1076,7 @@ export function OpsPage() {
       if (pausedUntil && now < pausedUntil) return;
       manualQueueRefreshInFlightRef.current = true;
       void loadFlows({ source: "auto" })
-        .then(() => resetManualQueueAutoRefreshPause())
+        .then(() => recordManualQueueAutoRefreshSuccess())
         .catch((e) => {
           const msg = e instanceof Error ? e.message : String(e);
           setManualQueueFailureCount((c) => {
@@ -2225,6 +2233,10 @@ export function OpsPage() {
                 : manualQueuePausedUntilMs && nowMs < manualQueuePausedUntilMs
                   ? `queue: paused ${formatRemaining(manualQueuePausedUntilMs - nowMs)} (${manualQueueAutoRefreshSeconds}s)`
                   : `queue: ${manualQueueAutoRefreshSeconds}s`}
+              {manualQueueAutoRefreshSeconds !== 0 && manualQueuePausedUntilMs && nowMs < manualQueuePausedUntilMs && manualQueueLastError
+                ? ` · ${shortError(manualQueueLastError, 60)}`
+                : ""}
+              {manualQueueLastOkAtMs ? ` · ok ${new Date(manualQueueLastOkAtMs).toLocaleTimeString()}` : ""}
             </span>
             {manualQueueAutoRefreshSeconds !== 0 && manualQueuePausedUntilMs && nowMs < manualQueuePausedUntilMs ? (
               <Button view="flat" size="s" onClick={resetManualQueueAutoRefreshPause}>
@@ -2825,6 +2837,24 @@ export function OpsPage() {
                         download {downloadProgress.done}/{downloadProgress.total}
                       </span>
                     ) : null}
+                    <span className="muted" data-testid="ops-download-helper" style={{ whiteSpace: "nowrap" }}>
+                      Tip: for 10+ selections a confirm appears. Use “Download as one zip” to reduce downloads.
+                    </span>
+                    {selectedTaskIds.length > 0 ? (
+                      <span className="muted" style={{ whiteSpace: "nowrap" }}>
+                        selected {selectedTaskIds.length}
+                      </span>
+                    ) : null}
+                    {selectedTaskIds.length > 0 ? (
+                      <Button
+                        size="s"
+                        view="flat"
+                        disabled={isBulkRunning || isDownloadRunning}
+                        onClick={() => setSelectedTaskIds([])}
+                      >
+                        Clear selection
+                      </Button>
+                    ) : null}
 		              </div>
               </div>
             </div>
@@ -2939,6 +2969,11 @@ export function OpsPage() {
                             ) : null}
                           </div>
                         )}
+                        {webhookLast && typeof webhookLast.attempt_no === "number" ? (
+                          <p className="muted mono" style={{ marginTop: 6, marginBottom: 0 }}>
+                            last attempt #{webhookLast.attempt_no}
+                          </p>
+                        ) : null}
                         <div className="row-tight" style={{ marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
                           <Button
                             size="s"
@@ -2953,7 +2988,7 @@ export function OpsPage() {
                             <Button
                               size="s"
                               view="outlined"
-                              disabled={webhookResendRunning}
+                              disabled={webhookResendRunning || webhookDeliveriesLoading}
                               loading={webhookResendRunning}
                               onClick={() => void resendWebhook(selectedFlow.id)}
                               data-testid="ops-webhook-resend"
@@ -2971,9 +3006,14 @@ export function OpsPage() {
                             disabled={webhookDeliveriesLoading}
                             data-testid="ops-webhook-toggle-attempts"
                           >
-                            {webhookAttemptsOpen ? "Hide attempts" : "Show attempts"}
+                            {webhookAttemptsOpen
+                              ? `Hide attempts${webhookDeliveries.length ? ` (${webhookDeliveries.length})` : ""}`
+                              : `Show attempts${webhookDeliveries.length ? ` (${webhookDeliveries.length})` : ""}`}
                           </Button>
                         </div>
+                        <p className="muted" style={{ marginTop: 6, marginBottom: 0 }}>
+                          Resend enqueues a new delivery attempt; refresh or open attempts to see it land.
+                        </p>
                       </>
                     )}
                     {webhookAttemptsOpen && canViewWebhookDeliveries ? (
@@ -2981,6 +3021,11 @@ export function OpsPage() {
                         {webhookDeliveriesLoading ? <p className="muted">Loading attempts…</p> : null}
                         {!webhookDeliveriesLoading && webhookDeliveries.length === 0 ? (
                           <p className="muted">No attempts loaded (open again or refresh).</p>
+                        ) : null}
+                        {!webhookDeliveriesLoading && webhookDeliveries.length > 0 ? (
+                          <p className="muted mono" style={{ marginTop: 0 }}>
+                            attempts loaded: {webhookDeliveries.length}
+                          </p>
                         ) : null}
                         {webhookDeliveries.map((d) => (
                           <div

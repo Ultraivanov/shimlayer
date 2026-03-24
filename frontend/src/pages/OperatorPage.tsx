@@ -45,6 +45,7 @@ export function OperatorPage() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [openTaskId, setOpenTaskId] = useState<string>("");
   const [openTaskBusy, setOpenTaskBusy] = useState<boolean>(false);
+  const [showDemo, setShowDemo] = useState<boolean>(false);
   const [createBusy, setCreateBusy] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -358,6 +359,7 @@ export function OperatorPage() {
         setAutoRefreshLastError(res.error ?? "unknown error");
         const pauseSeconds = Math.min(120, 10 * 2 ** Math.min(4, nextFailures - 1));
         setAutoRefreshPausedUntilMs(Date.now() + pauseSeconds * 1000);
+        if (autoRefreshFailureCount === 0) pushToast("error", `Auto-refresh failed; pausing for ${pauseSeconds}s`);
       });
     }, autoRefreshSeconds * 1000);
     return () => window.clearInterval(timer);
@@ -681,6 +683,9 @@ export function OperatorPage() {
                 : isPageVisible
                   ? ""
                   : "(paused)"}
+              {autoRefreshSeconds !== 0 && autoRefreshPausedUntilMs > nowMs && autoRefreshLastError
+                ? ` · ${autoRefreshLastError}`
+                : ""}
             </span>
             <Button view={autoRefreshSeconds === 0 ? "action" : "outlined"} size="s" onClick={() => setAutoRefreshSeconds(0)}>Off</Button>
             <Button view={autoRefreshSeconds === 15 ? "action" : "outlined"} size="s" onClick={() => setAutoRefreshSeconds(15)}>15s</Button>
@@ -701,8 +706,22 @@ export function OperatorPage() {
             >
               Refresh
             </Button>
+            <Button view={showDemo ? "action" : "outlined"} size="s" onClick={() => setShowDemo((v) => !v)} title="Show/hide demo helpers">
+              Demo
+            </Button>
           </div>
         </div>
+        {showDemo ? (
+          <div className="row-tight" style={{ alignItems: "center", flexWrap: "wrap" }}>
+            <span className="chip chip-muted">demo</span>
+            <Button size="s" view="outlined" disabled={createBusy} loading={createBusy} onClick={() => void createDemoTask("stuck_recovery")}>
+              Create stuck task
+            </Button>
+            <Button size="s" view="outlined" disabled={createBusy} loading={createBusy} onClick={() => void createDemoTask("quick_judgment")}>
+              Create judgment task
+            </Button>
+          </div>
+        ) : null}
         <div className="row-tight" style={{ alignItems: "center" }}>
           <TextInput
             size="m"
@@ -852,6 +871,9 @@ export function OperatorPage() {
                   Copy
                 </Button>
               </div>
+              <p className="muted" style={{ marginTop: 6 }}>
+                Load pulls the interruption record; Approve/Reject creates a resume payload for the agent.
+              </p>
 
               {openAiFromSelectedTask ? (
                 <p className="muted" style={{ marginTop: 8, marginBottom: 0 }}>
@@ -990,6 +1012,9 @@ export function OperatorPage() {
                   To unblock completion, provide a valid <span className="mono">checksum_sha256</span> (unless <span className="mono">storage_path</span> is <span className="mono">local:</span>).
                 </p>
               </div>
+              <p className="muted" style={{ marginTop: 6 }}>
+                Quality proof = local upload or checksum-verified external proof. Required before completing the task.
+              </p>
               <div className="row-tight" style={{ alignItems: "center" }}>
                 <Select
                   width="max"
@@ -1172,6 +1197,19 @@ export function OperatorPage() {
                 More
               </Button>
             </div>
+            <p className="muted" style={{ marginTop: 6 }}>
+              {isOpenAiInterruptionTask
+                ? "Next: decide Approve/Reject in the OpenAI interruption section."
+                : !isActionable
+                  ? "No action needed: task is in a terminal state."
+                  : selectedTask.status === "queued"
+                    ? hasQualityProof
+                      ? "Next: claim the task to start work."
+                      : "Next: upload local proof (recommended) or link external proof."
+                    : hasQualityProof
+                      ? "Next: complete the task."
+                      : "Next: upload proof to unblock completion."}
+            </p>
             {showMoreActions ? (
               <div className="row-tight" style={{ marginTop: 8, flexWrap: "wrap" }}>
                 <Button size="m" view="flat" onClick={() => void copyText(selectedTask.id)}>
@@ -1200,13 +1238,6 @@ export function OperatorPage() {
                   }}
                 >
                   Download bundle
-                </Button>
-                <span className="chip chip-muted" title="Local demo tools for testing the Operator flow">demo</span>
-                <Button size="m" view="outlined" disabled={createBusy} loading={createBusy} onClick={() => void createDemoTask("stuck_recovery")}>
-                  Create stuck task
-                </Button>
-                <Button size="m" view="outlined" disabled={createBusy} loading={createBusy} onClick={() => void createDemoTask("quick_judgment")}>
-                  Create judgment task
                 </Button>
               </div>
             ) : null}

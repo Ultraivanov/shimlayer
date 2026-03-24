@@ -4,6 +4,8 @@
 - Open Ops -> `Flows` view.
 - Enable `SLA breach queue` for urgent tasks.
 - Use search by `task_id/account_id/type/status`.
+- Manual review queue: auto-refresh shows last OK time and pauses on errors.
+- For bulk downloads, use `Download as one zip` to reduce multiple file prompts.
 - Claim the case owner and add internal note before sensitive actions.
 
 ## 2. Sensitive actions policy
@@ -22,6 +24,7 @@
 - Open `Observability` and review DLQ count.
 - Requeue DLQ items only after callback endpoint is healthy.
 - If repeated failures continue, open incident with type `webhook_degradation`.
+- `Resend now` enqueues a new delivery attempt; refresh or open attempts to verify.
 
 ## 5. Finance checks
 - Open `Finance` view.

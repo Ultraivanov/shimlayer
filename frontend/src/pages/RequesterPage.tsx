@@ -1068,6 +1068,9 @@ export function RequesterPage({ pushTask }: Props) {
             disabled={createBusy}
           />
         </div>
+        <p className="muted" style={{ marginTop: 6 }}>
+          SLA is in seconds. Callback URL enables webhook deliveries and retries.
+        </p>
         <div style={{ marginTop: 8 }}>
           <TextArea
             value={createContextJson}
@@ -1077,6 +1080,9 @@ export function RequesterPage({ pushTask }: Props) {
             disabled={createBusy}
           />
         </div>
+        <p className="muted" style={{ marginTop: 6 }}>
+          Context must be a JSON object; keep it minimal and proof‑safe.
+        </p>
         <div className="row-tight" style={{ marginTop: 8, alignItems: "center" }}>
           <Button size="m" view="outlined" disabled={createBusy} onClick={createStuckTask}>
             Load stuck preset
@@ -1127,6 +1133,9 @@ export function RequesterPage({ pushTask }: Props) {
             </button>
           </div>
         </div>
+        <p className="muted" style={{ marginTop: 6 }}>
+          Ingest creates a ShimLayer task. Load fetches an existing interruption by ID.
+        </p>
 
         {openAiMode === "ingest" ? (
           <div className="detail-block">
@@ -1552,6 +1561,15 @@ export function RequesterPage({ pushTask }: Props) {
             </div>
           ) : null}
         </div>
+        {selectedTask ? (
+          <p className="muted" style={{ marginTop: 6 }}>
+            {!["queued", "claimed"].includes(selectedTask.status)
+              ? "No action needed: task is in a terminal state."
+              : hasQualityProof
+                ? "Next: complete the task."
+                : "Next: add proof (local upload recommended) to unblock completion."}
+          </p>
+        ) : null}
         {selectedTask && showDebug ? (
           <div className="detail-block" style={{ paddingTop: 0 }}>
             <div className="row-tight" style={{ alignItems: "center", flexWrap: "wrap" }}>
