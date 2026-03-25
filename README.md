@@ -54,6 +54,10 @@ pytest -q
 
 ## One-command checks
 
+Quick release checklist (short):
+- `./scripts/preflight_fast.sh` + `./scripts/preflight_ui.sh`
+- Verify env/secrets + DB schema (see `docs/release-checklist.md`)
+
 ## Product map
 
 - End-to-end user journey (Requester → Operator → Ops): `docs/user-journey.md`
