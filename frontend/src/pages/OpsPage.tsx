@@ -627,7 +627,6 @@ export function OpsPage() {
 
   function resetTrendHistory() {
     setMetricsHistory([]);
-    localStorage.removeItem(METRICS_HISTORY_KEY);
   }
 
   function pushToast(level: ToastLevel, text: string) {
