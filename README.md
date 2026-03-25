@@ -57,6 +57,7 @@ pytest -q
 ## Product map
 
 - End-to-end user journey (Requester → Operator → Ops): `docs/user-journey.md`
+- Release checklist (primary): `docs/release-checklist.md`
 - Requester hybrid integration (push + pull fallback): `docs/requester-hybrid-integration.md`
 - OpenAI interruptions (resume loop): `docs/requester-hybrid-integration.md` (section 0)
 - Alpha local runbook: `docs/alpha-local-runbook.md`
