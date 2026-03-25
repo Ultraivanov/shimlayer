@@ -79,3 +79,10 @@ Ops:
 - If the browser UI is deployed publicly, **do not ship real admin keys** into `VITE_*` variables (they become public in JS). Keep the UI internal or introduce a proper auth gateway.
 - Startup warnings like `startup_security_warning` must not appear in production logs (rotate secrets).
 See `docs/security-notes.md` for the minimum security posture.
+
+## Current status (handoff)
+
+- **Release readiness:** release‑ready (see `docs/release-summary.md`).
+- **Latest UI preflight:** `./scripts/preflight_ui.sh` passed (15/15).
+- **Latest commits:** main branch up to `978003c` (release summary pinned).
+- **Open items / risks:** none identified.
