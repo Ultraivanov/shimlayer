@@ -693,7 +693,7 @@ export function OperatorPage() {
             <Button view={autoRefreshSeconds === 60 ? "action" : "outlined"} size="s" onClick={() => setAutoRefreshSeconds(60)}>60s</Button>
             {autoRefreshSeconds !== 0 && autoRefreshPausedUntilMs > nowMs ? (
               <Button view="flat" size="s" onClick={resetAutoRefreshPause}>
-                Resume
+                Resume auto
               </Button>
             ) : null}
             <Button
@@ -748,7 +748,7 @@ export function OperatorPage() {
           </Button>
         </div>
         <p className="muted" style={{ marginTop: 6 }}>
-          Tip: use “Open by Task ID” when you receive a customer-reported UUID or an OpenAI interruption task.
+          Tip: use “Open by Task ID” for customer‑reported UUIDs or OpenAI interruption tasks.
         </p>
         <div className="row-tight">
           <Select

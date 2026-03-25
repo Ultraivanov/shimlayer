@@ -1344,7 +1344,7 @@ export function RequesterPage({ pushTask }: Props) {
               ? `(paused ${formatDurationShort(autoRefreshPausedUntilMs - nowMs)})`
               : isPageVisible
                 ? ""
-                : "(paused)"}
+                : "(tab hidden)"}
             {autoRefreshSeconds !== 0 && autoRefreshPausedUntilMs > nowMs && autoRefreshLastError
               ? ` · ${autoRefreshLastError}`
               : ""}
@@ -1353,7 +1353,7 @@ export function RequesterPage({ pushTask }: Props) {
             size="m"
             value={taskLookupId}
             onUpdate={setTaskLookupId}
-            placeholder="Open by Task ID"
+            placeholder="Open by Task ID (UUID)"
             disabled={taskLookupBusy}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -1379,7 +1379,7 @@ export function RequesterPage({ pushTask }: Props) {
           />
           {autoRefreshSeconds !== 0 && autoRefreshPausedUntilMs > nowMs ? (
             <Button view="flat" onClick={resetAutoRefreshPause}>
-              Resume
+              Resume auto
             </Button>
           ) : null}
           <Button
@@ -1396,7 +1396,7 @@ export function RequesterPage({ pushTask }: Props) {
           </Button>
         </div>
         <p className="muted" style={{ marginTop: 6 }}>
-          Tip: “Open by Task ID” jumps directly to a task from webhook payloads or interruptions. Auto-refresh pauses on repeated errors — hit “Resume” to recover.
+          Tip: “Open by Task ID” jumps directly to a task from webhook payloads or interruptions. Auto-refresh pauses on repeated errors — hit “Resume auto” to recover.
         </p>
         {showDemo ? (
           <div className="row-tight" style={{ alignItems: "center", flexWrap: "wrap" }}>
