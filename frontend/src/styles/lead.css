@@ -2,7 +2,9 @@
 
 .lead-root {
   min-height: 100vh;
-  background: #0b0f1a;
+  background: radial-gradient(1200px 800px at 10% -10%, rgba(34, 211, 238, 0.08), transparent),
+              radial-gradient(1200px 800px at 90% 0%, rgba(124, 58, 237, 0.08), transparent),
+              #0b0f1a;
   color: #e5e7eb;
   font-family: "IBM Plex Mono", "Inter", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
@@ -20,9 +22,9 @@
   position: sticky;
   top: 0;
   z-index: 5;
-  backdrop-filter: blur(8px);
-  background: rgba(11, 15, 26, 0.8);
-  border-bottom: 1px solid #1f2937;
+  backdrop-filter: blur(10px);
+  background: rgba(9, 12, 20, 0.85);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
 }
 
 .lead-nav-inner {
@@ -83,15 +85,15 @@
 }
 
 .lead-hero-copy h1 {
-  font-size: 42px;
+  font-size: 46px;
   line-height: 1.1;
   margin: 16px 0 12px;
 }
 
 .lead-subtitle {
   color: #cbd5f5;
-  font-size: 16px;
-  line-height: 1.6;
+  font-size: 17px;
+  line-height: 1.7;
 }
 
 .lead-meta {
@@ -107,12 +109,12 @@
 }
 
 .lead-chip {
-  border: 1px solid #1f2937;
-  padding: 4px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  padding: 6px 12px;
   border-radius: 999px;
   font-size: 11px;
   color: #a5b4fc;
-  background: #0f172a;
+  background: rgba(15, 23, 42, 0.7);
 }
 
 .lead-cta-row {
@@ -123,8 +125,9 @@
 }
 
 .lead-panel {
-  background: #0b1220;
-  border: 1px solid #1f2937;
+  background: rgba(12, 16, 26, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: 0 18px 40px rgba(3, 7, 18, 0.35);
 }
 
 .lead-panel-title {
@@ -140,7 +143,7 @@
   margin: 0;
   padding-left: 18px;
   color: #cbd5f5;
-  line-height: 1.7;
+  line-height: 1.8;
 }
 
 .lead-audience-grid,
@@ -158,8 +161,8 @@
 }
 
 .lead-code {
-  background: #0f172a;
-  border: 1px solid #1f2937;
+  background: #0d1625;
+  border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 12px;
   padding: 18px;
   color: #e2e8f0;
@@ -178,8 +181,8 @@
 }
 
 .lead-io-row {
-  background: #0f172a;
-  border: 1px solid #1f2937;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 10px;
   padding: 12px 14px;
   display: flex;
@@ -219,7 +222,7 @@
 }
 
 .lead-price {
-  font-size: 28px;
+  font-size: 30px;
   font-weight: 600;
   color: #e2e8f0;
 }
@@ -230,8 +233,8 @@
 }
 
 .lead-price-card {
-  border: 1px solid #1f2937;
-  background: #0f172a;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.7);
   padding: 12px 14px;
   border-radius: 10px;
   font-size: 13px;
@@ -276,7 +279,7 @@
 }
 
 .lead-footer {
-  border-top: 1px solid #1f2937;
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
   padding: 24px;
 }
 
@@ -287,6 +290,39 @@
   gap: 24px;
   color: #94a3b8;
   font-size: 12px;
+}
+
+.lead-hero-grid,
+.lead-audience-grid,
+.lead-split,
+.lead-how-grid,
+.lead-pricing-grid,
+.lead-form-grid {
+  row-gap: 24px;
+}
+
+.lead-panel-title + .lead-muted {
+  margin-top: 8px;
+}
+
+.lead-hero-copy {
+  padding-right: 12px;
+}
+
+.lead-hero .lead-panel {
+  padding: 24px;
+}
+
+.lead-proof .lead-panel {
+  padding: 20px 22px;
+}
+
+.lead-section .lead-panel {
+  padding: 24px;
+}
+
+.lead-footer-inner span {
+  opacity: 0.7;
 }
 
 @media (max-width: 980px) {

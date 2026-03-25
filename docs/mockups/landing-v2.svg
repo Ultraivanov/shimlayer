@@ -4,122 +4,157 @@
       <stop offset="0" stop-color="#0B0F1A"/>
       <stop offset="1" stop-color="#0F172A"/>
     </linearGradient>
-    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="10" stdDeviation="20" flood-color="#000000" flood-opacity="0.35"/>
-    </filter>
+    <linearGradient id="accent" x1="0" y1="0" x2="220" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7C3AED"/>
+      <stop offset="1" stop-color="#22D3EE"/>
+    </linearGradient>
   </defs>
 
   <rect width="1440" height="2600" fill="url(#bg)"/>
 
-  <!-- Top Nav -->
-  <rect x="80" y="28" width="1280" height="64" rx="16" fill="#0B1220" stroke="#1F2937"/>
-  <rect x="104" y="50" width="120" height="20" rx="6" fill="#1F2937"/>
-  <rect x="260" y="50" width="90" height="20" rx="6" fill="#111827"/>
-  <rect x="360" y="50" width="90" height="20" rx="6" fill="#111827"/>
-  <rect x="460" y="50" width="90" height="20" rx="6" fill="#111827"/>
-  <rect x="1160" y="44" width="180" height="32" rx="10" fill="#22D3EE"/>
+  <!-- Nav -->
+  <rect x="80" y="24" width="1280" height="68" rx="16" fill="#0B1220" stroke="#1F2937"/>
+  <circle cx="116" cy="58" r="10" fill="#22D3EE"/>
+  <text x="136" y="64" fill="#E2E8F0" font-size="14" font-family="IBM Plex Mono, monospace">ShimLayer</text>
+  <text x="520" y="64" fill="#94A3B8" font-size="12" font-family="IBM Plex Mono, monospace">How it works</text>
+  <text x="640" y="64" fill="#94A3B8" font-size="12" font-family="IBM Plex Mono, monospace">Scope</text>
+  <text x="720" y="64" fill="#94A3B8" font-size="12" font-family="IBM Plex Mono, monospace">Pricing</text>
+  <text x="820" y="64" fill="#94A3B8" font-size="12" font-family="IBM Plex Mono, monospace">Alpha</text>
+  <rect x="1130" y="40" width="210" height="36" rx="10" fill="#22D3EE"/>
+  <text x="1165" y="63" fill="#0B0F1A" font-size="12" font-family="IBM Plex Mono, monospace">Request Alpha Access</text>
 
   <!-- Hero -->
-  <rect x="80" y="120" width="1280" height="340" rx="24" fill="#0B1220" stroke="#1F2937" filter="url(#softShadow)"/>
-  <rect x="120" y="152" width="90" height="24" rx="8" fill="#111827"/>
-  <rect x="220" y="152" width="110" height="24" rx="8" fill="#111827"/>
-  <rect x="340" y="152" width="120" height="24" rx="8" fill="#111827"/>
-  <rect x="120" y="198" width="640" height="48" rx="10" fill="#0F172A"/>
-  <rect x="120" y="258" width="520" height="22" rx="8" fill="#111827"/>
-  <rect x="120" y="288" width="460" height="22" rx="8" fill="#111827"/>
-  <rect x="120" y="330" width="220" height="46" rx="12" fill="#7C3AED"/>
-  <rect x="360" y="330" width="220" height="46" rx="12" fill="#111827"/>
-  <rect x="840" y="170" width="480" height="250" rx="18" fill="#0F172A" stroke="#1F2937"/>
-  <rect x="870" y="198" width="420" height="22" rx="8" fill="#111827"/>
-  <rect x="870" y="230" width="360" height="18" rx="6" fill="#111827"/>
-  <rect x="870" y="260" width="420" height="120" rx="14" fill="#0B1220" stroke="#1F2937"/>
-  <rect x="890" y="282" width="220" height="14" rx="6" fill="#111827"/>
-  <rect x="890" y="306" width="260" height="14" rx="6" fill="#111827"/>
-  <rect x="890" y="330" width="180" height="14" rx="6" fill="#111827"/>
-  <rect x="1140" y="282" width="140" height="80" rx="12" fill="#111827"/>
+  <rect x="80" y="120" width="1280" height="360" rx="24" fill="#0B1220" stroke="#1F2937"/>
+  <rect x="120" y="152" width="72" height="24" rx="12" fill="#111827" stroke="#1F2937"/>
+  <text x="132" y="168" fill="#A5B4FC" font-size="10" font-family="IBM Plex Mono, monospace">ALPHA</text>
+  <rect x="204" y="152" width="92" height="24" rx="12" fill="#111827" stroke="#1F2937"/>
+  <text x="214" y="168" fill="#A5B4FC" font-size="10" font-family="IBM Plex Mono, monospace">API‑FIRST</text>
+  <rect x="304" y="152" width="104" height="24" rx="12" fill="#111827" stroke="#1F2937"/>
+  <text x="316" y="168" fill="#A5B4FC" font-size="10" font-family="IBM Plex Mono, monospace">TRACEABLE</text>
 
-  <!-- Audience filter -->
-  <rect x="80" y="500" width="1280" height="140" rx="20" fill="#0B1220" stroke="#1F2937"/>
-  <rect x="120" y="530" width="240" height="18" rx="6" fill="#111827"/>
-  <rect x="120" y="562" width="520" height="18" rx="6" fill="#111827"/>
-  <rect x="120" y="590" width="460" height="18" rx="6" fill="#111827"/>
-  <rect x="720" y="530" width="180" height="18" rx="6" fill="#111827"/>
-  <rect x="720" y="562" width="520" height="18" rx="6" fill="#111827"/>
-  <rect x="720" y="590" width="420" height="18" rx="6" fill="#111827"/>
+  <text x="120" y="226" fill="#E2E8F0" font-size="36" font-family="IBM Plex Mono, monospace">Human recovery layer</text>
+  <text x="120" y="262" fill="#E2E8F0" font-size="36" font-family="IBM Plex Mono, monospace">for AI agents</text>
+  <text x="120" y="304" fill="#CBD5F5" font-size="15" font-family="Inter, sans-serif">When an agent gets stuck, uncertain, or reaches a risky action,</text>
+  <text x="120" y="328" fill="#CBD5F5" font-size="15" font-family="Inter, sans-serif">ShimLayer routes the step to a human and returns a bounded intervention.</text>
+  <text x="120" y="356" fill="#94A3B8" font-size="12" font-family="IBM Plex Mono, monospace">API‑first · 1–3 min interventions · full trace</text>
+  <rect x="120" y="380" width="220" height="46" rx="12" fill="#7C3AED"/>
+  <text x="150" y="408" fill="#F8FAFC" font-size="12" font-family="IBM Plex Mono, monospace">Request Alpha Access</text>
+  <rect x="352" y="380" width="210" height="46" rx="12" fill="#111827" stroke="#1F2937"/>
+  <text x="392" y="408" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">See how it works</text>
 
-  <!-- Problem / Solution -->
-  <rect x="80" y="680" width="620" height="220" rx="20" fill="#0B1220" stroke="#1F2937"/>
-  <rect x="120" y="710" width="200" height="20" rx="6" fill="#111827"/>
-  <rect x="120" y="742" width="420" height="16" rx="6" fill="#111827"/>
-  <rect x="120" y="770" width="360" height="16" rx="6" fill="#111827"/>
-  <rect x="120" y="798" width="300" height="16" rx="6" fill="#111827"/>
-  <rect x="120" y="826" width="260" height="16" rx="6" fill="#111827"/>
+  <rect x="820" y="160" width="500" height="280" rx="18" fill="#0F172A" stroke="#1F2937"/>
+  <text x="852" y="192" fill="#A5B4FC" font-size="11" font-family="IBM Plex Mono, monospace">Runtime boundary</text>
+  <rect x="852" y="210" width="436" height="1" fill="#1F2937"/>
+  <text x="852" y="236" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">• Escalate only on stuck / low‑confidence / risky</text>
+  <text x="852" y="262" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">• Human returns minimal decision + trace</text>
+  <text x="852" y="288" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">• Structured output + replayable logs</text>
+  <text x="852" y="314" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">• Push + pull delivery for convergence</text>
 
-  <rect x="740" y="680" width="620" height="220" rx="20" fill="#0B1220" stroke="#1F2937"/>
-  <rect x="780" y="710" width="220" height="20" rx="6" fill="#111827"/>
-  <rect x="780" y="742" width="460" height="16" rx="6" fill="#111827"/>
-  <rect x="780" y="770" width="420" height="16" rx="6" fill="#111827"/>
-  <rect x="780" y="798" width="380" height="16" rx="6" fill="#111827"/>
+  <!-- Audience -->
+  <text x="80" y="560" fill="#94A3B8" font-size="12" font-family="IBM Plex Mono, monospace">01</text>
+  <rect x="80" y="580" width="620" height="180" rx="18" fill="#0B1220" stroke="#1F2937"/>
+  <text x="110" y="610" fill="#A5B4FC" font-size="11" font-family="IBM Plex Mono, monospace">THIS IS FOR</text>
+  <text x="110" y="642" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">• Teams running agents in production</text>
+  <text x="110" y="666" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">• Infra‑minded founders shipping workflows</text>
+  <text x="110" y="690" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">• Devs who need recovery without babysitting</text>
 
-  <!-- How it works (code) -->
-  <rect x="80" y="940" width="1280" height="260" rx="20" fill="#0B1220" stroke="#1F2937"/>
-  <rect x="120" y="970" width="180" height="20" rx="6" fill="#111827"/>
-  <rect x="120" y="1010" width="520" height="140" rx="12" fill="#0F172A" stroke="#1F2937"/>
-  <rect x="140" y="1030" width="200" height="14" rx="6" fill="#111827"/>
-  <rect x="140" y="1054" width="260" height="14" rx="6" fill="#111827"/>
-  <rect x="140" y="1078" width="300" height="14" rx="6" fill="#111827"/>
-  <rect x="140" y="1102" width="240" height="14" rx="6" fill="#111827"/>
-  <rect x="720" y="1010" width="600" height="140" rx="12" fill="#0F172A" stroke="#1F2937"/>
-  <rect x="740" y="1030" width="200" height="14" rx="6" fill="#111827"/>
-  <rect x="740" y="1054" width="320" height="14" rx="6" fill="#111827"/>
-  <rect x="740" y="1078" width="280" height="14" rx="6" fill="#111827"/>
-  <rect x="740" y="1102" width="260" height="14" rx="6" fill="#111827"/>
+  <rect x="740" y="580" width="620" height="180" rx="18" fill="#0B1220" stroke="#1F2937"/>
+  <text x="770" y="610" fill="#A5B4FC" font-size="11" font-family="IBM Plex Mono, monospace">THIS IS NOT FOR</text>
+  <text x="770" y="642" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">• Prompt playgrounds / demos only</text>
+  <text x="770" y="666" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">• General consumer AI curiosity</text>
+  <text x="770" y="690" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">• Teams without production pain</text>
 
-  <!-- MVP Scope -->
-  <rect x="80" y="1240" width="1280" height="200" rx="20" fill="#0B1220" stroke="#1F2937"/>
-  <rect x="120" y="1270" width="220" height="20" rx="6" fill="#111827"/>
-  <rect x="120" y="1306" width="520" height="16" rx="6" fill="#111827"/>
-  <rect x="120" y="1334" width="460" height="16" rx="6" fill="#111827"/>
-  <rect x="120" y="1362" width="420" height="16" rx="6" fill="#111827"/>
-  <rect x="120" y="1390" width="360" height="16" rx="6" fill="#111827"/>
+  <!-- Problem/Solution -->
+  <text x="80" y="810" fill="#94A3B8" font-size="12" font-family="IBM Plex Mono, monospace">02</text>
+  <rect x="80" y="830" width="620" height="200" rx="18" fill="#0B1220" stroke="#1F2937"/>
+  <text x="110" y="860" fill="#A5B4FC" font-size="11" font-family="IBM Plex Mono, monospace">FAILURE MODES</text>
+  <text x="110" y="892" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">• stuck loops and retries</text>
+  <text x="110" y="916" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">• UI / flow drift</text>
+  <text x="110" y="940" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">• low‑confidence decisions</text>
+  <text x="110" y="964" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">• risky actions</text>
 
-  <!-- Proof / Trust -->
-  <rect x="80" y="1480" width="1280" height="180" rx="20" fill="#0B1220" stroke="#1F2937"/>
-  <rect x="120" y="1510" width="240" height="20" rx="6" fill="#111827"/>
-  <rect x="120" y="1544" width="520" height="16" rx="6" fill="#111827"/>
-  <rect x="120" y="1572" width="460" height="16" rx="6" fill="#111827"/>
-  <rect x="720" y="1510" width="500" height="80" rx="14" fill="#0F172A" stroke="#1F2937"/>
-  <rect x="740" y="1530" width="180" height="14" rx="6" fill="#111827"/>
-  <rect x="740" y="1554" width="260" height="14" rx="6" fill="#111827"/>
+  <rect x="740" y="830" width="620" height="200" rx="18" fill="#0B1220" stroke="#1F2937"/>
+  <text x="770" y="860" fill="#A5B4FC" font-size="11" font-family="IBM Plex Mono, monospace">SOLUTION BOUNDARY</text>
+  <text x="770" y="892" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">1. detect stuck / unsafe</text>
+  <text x="770" y="916" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">2. package context</text>
+  <text x="770" y="940" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">3. human resolves</text>
+  <text x="770" y="964" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">4. agent continues</text>
+
+  <!-- How -->
+  <text x="80" y="1080" fill="#94A3B8" font-size="12" font-family="IBM Plex Mono, monospace">03</text>
+  <rect x="80" y="1100" width="1280" height="240" rx="18" fill="#0B1220" stroke="#1F2937"/>
+  <text x="110" y="1130" fill="#A5B4FC" font-size="11" font-family="IBM Plex Mono, monospace">HOW IT WORKS</text>
+  <rect x="110" y="1150" width="560" height="150" rx="12" fill="#0F172A" stroke="#1F2937"/>
+  <text x="130" y="1180" fill="#E2E8F0" font-size="12" font-family="IBM Plex Mono, monospace">agent.run()</text>
+  <text x="130" y="1206" fill="#E2E8F0" font-size="12" font-family="IBM Plex Mono, monospace">if stuck or low_confidence:</text>
+  <text x="130" y="1232" fill="#E2E8F0" font-size="12" font-family="IBM Plex Mono, monospace">    result = shimlayer.resolve(context)</text>
+  <text x="130" y="1258" fill="#E2E8F0" font-size="12" font-family="IBM Plex Mono, monospace">    agent.apply(result)</text>
+
+  <rect x="720" y="1150" width="600" height="150" rx="12" fill="#0F172A" stroke="#1F2937"/>
+  <text x="740" y="1180" fill="#A5B4FC" font-size="11" font-family="IBM Plex Mono, monospace">input</text>
+  <text x="800" y="1180" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">logs, state, screenshot / DOM</text>
+  <text x="740" y="1212" fill="#A5B4FC" font-size="11" font-family="IBM Plex Mono, monospace">output</text>
+  <text x="810" y="1212" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">next action, structured result, trace</text>
+  <text x="740" y="1244" fill="#A5B4FC" font-size="11" font-family="IBM Plex Mono, monospace">delivery</text>
+  <text x="820" y="1244" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">push + pull (convergent)</text>
+
+  <!-- Scope -->
+  <text x="80" y="1390" fill="#94A3B8" font-size="12" font-family="IBM Plex Mono, monospace">04</text>
+  <rect x="80" y="1410" width="1280" height="160" rx="18" fill="#0B1220" stroke="#1F2937"/>
+  <text x="110" y="1440" fill="#A5B4FC" font-size="11" font-family="IBM Plex Mono, monospace">ALPHA SCOPE</text>
+  <text x="110" y="1472" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">• stuck states and loops</text>
+  <text x="110" y="1496" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">• broken or changed UI</text>
+  <text x="110" y="1520" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">• binary decisions</text>
+  <text x="110" y="1544" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">• explicit human approval for risky actions</text>
+
+  <!-- Proof -->
+  <text x="80" y="1620" fill="#94A3B8" font-size="12" font-family="IBM Plex Mono, monospace">05</text>
+  <rect x="80" y="1640" width="1280" height="160" rx="18" fill="#0B1220" stroke="#1F2937"/>
+  <text x="110" y="1670" fill="#A5B4FC" font-size="11" font-family="IBM Plex Mono, monospace">PROOF LAYER</text>
+  <text x="110" y="1700" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">Execution log · timestamps · reason codes · replayable trace</text>
+  <rect x="110" y="1720" width="110" height="24" rx="12" fill="#111827" stroke="#1F2937"/>
+  <text x="122" y="1736" fill="#A5B4FC" font-size="10" font-family="IBM Plex Mono, monospace">EXEC LOG</text>
+  <rect x="230" y="1720" width="130" height="24" rx="12" fill="#111827" stroke="#1F2937"/>
+  <text x="242" y="1736" fill="#A5B4FC" font-size="10" font-family="IBM Plex Mono, monospace">TIMESTAMPS</text>
+  <rect x="368" y="1720" width="140" height="24" rx="12" fill="#111827" stroke="#1F2937"/>
+  <text x="380" y="1736" fill="#A5B4FC" font-size="10" font-family="IBM Plex Mono, monospace">REASON CODES</text>
+  <rect x="516" y="1720" width="90" height="24" rx="12" fill="#111827" stroke="#1F2937"/>
+  <text x="528" y="1736" fill="#A5B4FC" font-size="10" font-family="IBM Plex Mono, monospace">TRACE</text>
 
   <!-- Pricing -->
-  <rect x="80" y="1700" width="1280" height="240" rx="20" fill="#0B1220" stroke="#1F2937"/>
-  <rect x="120" y="1730" width="180" height="20" rx="6" fill="#111827"/>
-  <rect x="120" y="1762" width="460" height="16" rx="6" fill="#111827"/>
-  <rect x="120" y="1790" width="360" height="16" rx="6" fill="#111827"/>
-  <rect x="120" y="1828" width="120" height="40" rx="10" fill="#111827"/>
-  <rect x="260" y="1828" width="120" height="40" rx="10" fill="#111827"/>
-  <rect x="400" y="1828" width="120" height="40" rx="10" fill="#111827"/>
+  <text x="80" y="1860" fill="#94A3B8" font-size="12" font-family="IBM Plex Mono, monospace">06</text>
+  <rect x="80" y="1880" width="1280" height="200" rx="18" fill="#0B1220" stroke="#1F2937"/>
+  <text x="110" y="1910" fill="#A5B4FC" font-size="11" font-family="IBM Plex Mono, monospace">PRICING</text>
+  <text x="110" y="1950" fill="#E2E8F0" font-size="24" font-family="IBM Plex Mono, monospace">$1.80 per recovery</text>
+  <text x="110" y="1976" fill="#94A3B8" font-size="12" font-family="IBM Plex Mono, monospace">Free tier: 50 / month</text>
+  <rect x="720" y="1920" width="200" height="46" rx="10" fill="#0F172A" stroke="#1F2937"/>
+  <text x="748" y="1948" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">$49 · 25</text>
+  <rect x="940" y="1920" width="200" height="46" rx="10" fill="#0F172A" stroke="#1F2937"/>
+  <text x="966" y="1948" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">$199 · 120</text>
+  <rect x="1160" y="1920" width="200" height="46" rx="10" fill="#0F172A" stroke="#1F2937"/>
+  <text x="1184" y="1948" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">$999 · 600</text>
 
   <!-- Alpha -->
-  <rect x="80" y="1980" width="1280" height="160" rx="20" fill="#0B1220" stroke="#1F2937"/>
-  <rect x="120" y="2010" width="220" height="20" rx="6" fill="#111827"/>
-  <rect x="120" y="2042" width="520" height="16" rx="6" fill="#111827"/>
-  <rect x="120" y="2070" width="460" height="16" rx="6" fill="#111827"/>
+  <text x="80" y="2120" fill="#94A3B8" font-size="12" font-family="IBM Plex Mono, monospace">07</text>
+  <rect x="80" y="2140" width="1280" height="140" rx="18" fill="#0B1220" stroke="#1F2937"/>
+  <text x="110" y="2170" fill="#A5B4FC" font-size="11" font-family="IBM Plex Mono, monospace">ALPHA PROGRAM</text>
+  <text x="110" y="2202" fill="#CBD5F5" font-size="12" font-family="IBM Plex Mono, monospace">Early alpha · limited capacity · manual onboarding · direct feedback loop</text>
 
-  <!-- Lead form -->
-  <rect x="80" y="2180" width="1280" height="300" rx="20" fill="#0B1220" stroke="#1F2937"/>
-  <rect x="120" y="2210" width="200" height="20" rx="6" fill="#111827"/>
-  <rect x="120" y="2246" width="520" height="40" rx="10" fill="#0F172A" stroke="#1F2937"/>
-  <rect x="120" y="2296" width="520" height="40" rx="10" fill="#0F172A" stroke="#1F2937"/>
-  <rect x="120" y="2346" width="520" height="40" rx="10" fill="#0F172A" stroke="#1F2937"/>
-  <rect x="720" y="2246" width="520" height="40" rx="10" fill="#0F172A" stroke="#1F2937"/>
-  <rect x="720" y="2296" width="520" height="40" rx="10" fill="#0F172A" stroke="#1F2937"/>
-  <rect x="720" y="2346" width="220" height="44" rx="12" fill="#7C3AED"/>
+  <!-- Form -->
+  <text x="80" y="2340" fill="#94A3B8" font-size="12" font-family="IBM Plex Mono, monospace">08</text>
+  <rect x="80" y="2360" width="1280" height="210" rx="18" fill="#0B1220" stroke="#1F2937"/>
+  <text x="110" y="2390" fill="#A5B4FC" font-size="11" font-family="IBM Plex Mono, monospace">REQUEST ALPHA ACCESS</text>
+  <rect x="110" y="2410" width="520" height="40" rx="10" fill="#0F172A" stroke="#1F2937"/>
+  <rect x="110" y="2460" width="520" height="40" rx="10" fill="#0F172A" stroke="#1F2937"/>
+  <rect x="110" y="2510" width="520" height="40" rx="10" fill="#0F172A" stroke="#1F2937"/>
+  <rect x="720" y="2410" width="520" height="40" rx="10" fill="#0F172A" stroke="#1F2937"/>
+  <rect x="720" y="2460" width="520" height="40" rx="10" fill="#0F172A" stroke="#1F2937"/>
+  <rect x="720" y="2510" width="240" height="44" rx="12" fill="url(#accent)"/>
+  <text x="752" y="2538" fill="#0B0F1A" font-size="12" font-family="IBM Plex Mono, monospace">Request Alpha Access</text>
 
   <!-- Footer -->
-  <rect x="80" y="2520" width="1280" height="56" rx="14" fill="#0B1220" stroke="#1F2937"/>
-  <rect x="120" y="2540" width="120" height="16" rx="6" fill="#111827"/>
-  <rect x="260" y="2540" width="120" height="16" rx="6" fill="#111827"/>
-  <rect x="400" y="2540" width="120" height="16" rx="6" fill="#111827"/>
+  <rect x="80" y="2568" width="1280" height="48" rx="12" fill="#0B1220" stroke="#1F2937"/>
+  <text x="110" y="2598" fill="#94A3B8" font-size="11" font-family="IBM Plex Mono, monospace">Docs</text>
+  <text x="170" y="2598" fill="#94A3B8" font-size="11" font-family="IBM Plex Mono, monospace">Contact</text>
+  <text x="250" y="2598" fill="#94A3B8" font-size="11" font-family="IBM Plex Mono, monospace">Privacy</text>
 </svg>
