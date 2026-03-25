@@ -11,8 +11,11 @@ import type { Task } from "./types";
 type Tab = "requester" | "operator" | "ops";
 
 export default function App() {
-  if (typeof window !== "undefined" && window.location.pathname.startsWith("/lead")) {
-    return <LeadPage />;
+  if (typeof window !== "undefined") {
+    const path = window.location.pathname;
+    if (!path.startsWith("/app")) {
+      return <LeadPage />;
+    }
   }
   const [tab, setTab] = useState<Tab>("requester");
   const [, setTasks] = useState<Task[]>([]);
