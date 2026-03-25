@@ -464,7 +464,7 @@ test.describe("Ops smoke", () => {
     await waitForFlowRows(page, 2);
 
     await page.locator('[data-testid="ops-flow-queue"]').getByRole("button", { name: "Select page" }).click();
-    await expect(page.getByText("Selected")).toContainText("Selected");
+    await expect(page.getByTestId("ops-selected-count")).toContainText("Selected");
 
     await page.locator('[data-testid="ops-bulk-actions"]').getByRole("button", { name: "Dry-run bulk" }).click();
     await expect(page.locator(".toast-success")).toContainText("Bulk dry-run passed");
