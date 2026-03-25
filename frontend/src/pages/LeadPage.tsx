@@ -43,7 +43,7 @@ export function LeadPage() {
     const email = leadEmail.trim();
     const company = leadCompany.trim();
     if (!name || !email || !company) {
-      setSubmitError("Заполните имя, рабочий email и компанию.");
+      setSubmitError("Please add contact name, work email, and team/company.");
       return;
     }
     setSubmitBusy(true);
@@ -73,131 +73,225 @@ export function LeadPage() {
 
   return (
     <main className="lead-root">
-      <section className="lead-hero">
-        <div className="lead-hero-copy">
-          <span className="lead-pill">Ранний доступ · вайтлист</span>
-          <h1>Возвращайте агентные сбои в строй за минуты, а не дни.</h1>
-          <p className="lead-subtitle">
-            ShimLayer превращает прерывания OpenAI и «зависшие» прогоны в структурированные решения с доказательствами,
-            аудитом и надежной доставкой через push + pull.
+      <header className="lead-nav">
+        <div className="lead-nav-inner">
+          <div className="lead-brand">
+            <span className="lead-brand-mark" />
+            <span className="lead-brand-name">ShimLayer</span>
+          </div>
+          <nav className="lead-nav-links">
+            <a href="#how">How it works</a>
+            <a href="#scope">Scope</a>
+            <a href="#pricing">Pricing</a>
+            <a href="#alpha">Alpha</a>
+          </nav>
+          <Button size="m" view="action" onClick={() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+            Request Alpha Access
+          </Button>
+        </div>
+      </header>
+
+      <section className="lead-section lead-hero" id="top">
+        <div className="lead-hero-grid">
+          <div className="lead-hero-copy">
+            <div className="lead-chips">
+              <span className="lead-chip">ALPHA</span>
+              <span className="lead-chip">API‑FIRST</span>
+              <span className="lead-chip">TRACEABLE</span>
+            </div>
+            <h1>Human recovery layer for AI agents</h1>
+            <p className="lead-subtitle">
+              When an agent gets stuck, uncertain, or reaches a risky action, ShimLayer routes the step to a human,
+              returns a bounded intervention, and lets the agent continue.
+            </p>
+            <div className="lead-meta">API‑first · 1–3 min interventions · full trace</div>
+            <div className="lead-cta-row">
+              <Button size="l" view="action" onClick={() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+                Request Alpha Access
+              </Button>
+              <Button size="l" view="outlined" onClick={() => flowRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+                See how it works
+              </Button>
+            </div>
+          </div>
+          <Card className="lead-panel" view="raised">
+            <div className="lead-panel-title">Runtime boundary</div>
+            <ul className="lead-list">
+              <li>Agent escalates only when stuck / low‑confidence / risky</li>
+              <li>Human returns a minimal decision + traceable proof</li>
+              <li>Structured output, replayable logs, audit trail</li>
+              <li>Push + pull delivery for convergence</li>
+            </ul>
+          </Card>
+        </div>
+      </section>
+
+      <section className="lead-section lead-audience">
+        <div className="lead-section-label">01</div>
+        <div className="lead-audience-grid">
+          <Card className="lead-panel" view="raised">
+            <div className="lead-panel-title">This is for</div>
+            <ul className="lead-list">
+              <li>Teams running agents in production or close to it</li>
+              <li>Infra‑minded founders shipping autonomous workflows</li>
+              <li>Developers who need recovery without manual babysitting</li>
+            </ul>
+          </Card>
+          <Card className="lead-panel" view="raised">
+            <div className="lead-panel-title">This is not for</div>
+            <ul className="lead-list">
+              <li>Prompt playgrounds or demo‑only experiments</li>
+              <li>General consumer AI curiosity traffic</li>
+              <li>Teams without production pain yet</li>
+            </ul>
+          </Card>
+        </div>
+      </section>
+
+      <section className="lead-section lead-problem">
+        <div className="lead-section-label">02</div>
+        <div className="lead-split">
+          <Card className="lead-panel" view="raised">
+            <div className="lead-panel-title">Failure modes</div>
+            <ul className="lead-list">
+              <li>Stuck loops and retries that never converge</li>
+              <li>UI or flow drift after a product change</li>
+              <li>Low‑confidence decisions with no safe default</li>
+              <li>Risky actions that must be approved</li>
+            </ul>
+          </Card>
+          <Card className="lead-panel" view="raised">
+            <div className="lead-panel-title">Solution boundary</div>
+            <ol className="lead-steps">
+              <li>Agent detects stuck / unsafe state</li>
+              <li>ShimLayer packages context</li>
+              <li>Human resolves the minimal missing piece</li>
+              <li>Agent continues with structured output</li>
+            </ol>
+          </Card>
+        </div>
+      </section>
+
+      <section className="lead-section lead-how" id="how" ref={flowRef}>
+        <div className="lead-section-label">03</div>
+        <Card className="lead-panel" view="raised">
+          <div className="lead-panel-title">How it works</div>
+          <div className="lead-how-grid">
+            <div className="lead-code">
+              <pre>
+agent.run()
+
+if stuck or low_confidence:
+    result = shimlayer.resolve(context)
+    agent.apply(result)
+              </pre>
+            </div>
+            <div className="lead-io">
+              <div className="lead-io-row">
+                <span className="lead-io-label">input</span>
+                <span className="lead-io-value">logs, state, screenshot / DOM snapshot</span>
+              </div>
+              <div className="lead-io-row">
+                <span className="lead-io-label">output</span>
+                <span className="lead-io-value">next action, structured result, trace</span>
+              </div>
+              <div className="lead-io-row">
+                <span className="lead-io-label">delivery</span>
+                <span className="lead-io-value">push + pull (convergent)</span>
+              </div>
+            </div>
+          </div>
+        </Card>
+      </section>
+
+      <section className="lead-section lead-scope" id="scope">
+        <div className="lead-section-label">04</div>
+        <Card className="lead-panel" view="raised">
+          <div className="lead-panel-title">Alpha scope</div>
+          <ul className="lead-list">
+            <li>Stuck states and loops</li>
+            <li>Broken or changed UI</li>
+            <li>Binary decisions</li>
+            <li>Explicit human approval for risky actions</li>
+          </ul>
+        </Card>
+      </section>
+
+      <section className="lead-section lead-proof">
+        <div className="lead-section-label">05</div>
+        <Card className="lead-panel" view="raised">
+          <div className="lead-panel-title">Proof layer</div>
+          <p className="lead-muted">
+            Every intervention includes an execution log, timestamps, reason codes, and a replayable trace.
           </p>
-          <div className="lead-cta-row">
-            <Button
-              size="l"
-              view="action"
-              onClick={() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-            >
-              Войти в вайтлист
-            </Button>
-            <Button
-              size="l"
-              view="outlined"
-              onClick={() => flowRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-            >
-              Посмотреть как работает
-            </Button>
+          <div className="lead-proof-row">
+            <span className="lead-chip">EXEC LOG</span>
+            <span className="lead-chip">TIMESTAMPS</span>
+            <span className="lead-chip">REASON CODES</span>
+            <span className="lead-chip">TRACE</span>
           </div>
-          <div className="lead-trust">
-            <span>SLA по решениям</span>
-            <span>Артефакты доказательств</span>
-            <span>Manual review</span>
-            <span>Audit trail</span>
+        </Card>
+      </section>
+
+      <section className="lead-section lead-pricing" id="pricing">
+        <div className="lead-section-label">06</div>
+        <Card className="lead-panel" view="raised">
+          <div className="lead-panel-title">Pricing</div>
+          <div className="lead-pricing-grid">
+            <div className="lead-price-main">
+              <div className="lead-price">$1.80 per recovery</div>
+              <div className="lead-muted">Free tier: 50 per month</div>
+            </div>
+            <div className="lead-price-cards">
+              <div className="lead-price-card">$49 · 25 recoveries</div>
+              <div className="lead-price-card">$199 · 120 recoveries</div>
+              <div className="lead-price-card">$999 · 600 recoveries</div>
+            </div>
           </div>
-        </div>
-        <Card className="lead-hero-card" view="raised">
-          <h3>Что вы получаете</h3>
-          <ul>
-            <li>Approve/Reject для прерываний OpenAI</li>
-            <li>HITL-спасение «зависших» флоу</li>
-            <li>Доставка, которая сходится даже при сбоях вебхуков</li>
-            <li>Ops‑контроль: locks, queues, refunds, audits</li>
-          </ul>
         </Card>
       </section>
 
-      <section className="lead-proof">
-        <div className="lead-proof-head">
-          <h3>Нам доверяют команды, которые не могут ждать</h3>
-          <p>Вы первые — мы даем приоритет в онбординге и вместе формируем продукт.</p>
-        </div>
-        <div className="lead-logos">
-          <span className="logo-pill">Fintech</span>
-          <span className="logo-pill">E‑commerce</span>
-          <span className="logo-pill">Logistics</span>
-          <span className="logo-pill">Travel</span>
-          <span className="logo-pill">Security</span>
-        </div>
-        <div className="lead-quote">
-          <p>“Нужен был контроль над решениями агента — за 1 день получили прозрачно работающий контур.”</p>
-          <span>Ops Lead, design partner</span>
-        </div>
-      </section>
-
-      <section className="lead-grid">
-        <Card className="lead-metric" view="raised">
-          <h4>Минуты до решения</h4>
-          <p>Прозрачные SLA и быстрые операторы для критичных кейсов.</p>
-        </Card>
-        <Card className="lead-metric" view="raised">
-          <h4>Proof‑first результат</h4>
-          <p>Каждое решение сопровождается доказательствами и заметками.</p>
-        </Card>
-        <Card className="lead-metric" view="raised">
-          <h4>Надежная доставка</h4>
-          <p>Push + pull обеспечивает сходимость даже при сбоях.</p>
+      <section className="lead-section lead-alpha" id="alpha">
+        <div className="lead-section-label">07</div>
+        <Card className="lead-panel" view="raised">
+          <div className="lead-panel-title">Alpha program</div>
+          <p className="lead-muted">
+            Early alpha, limited capacity, manual onboarding, and a direct feedback loop with the founders.
+          </p>
         </Card>
       </section>
 
-      <section className="lead-flow" ref={flowRef}>
-        <Card className="lead-flow-card" view="raised">
-          <h3>Как это работает</h3>
-          <ol>
-            <li>Прерывание превращается в задачу ShimLayer.</li>
-            <li>Оператор принимает решение и прикладывает proof.</li>
-            <li>Вы возобновляете ран с подписанным payload.</li>
-          </ol>
-        </Card>
-        <Card className="lead-flow-card" view="raised">
-          <h3>Идеально для</h3>
-          <ul>
-            <li>Агентных флоу с непредсказуемыми edge‑кейcами</li>
-            <li>Высокорисковых решений с аудитом</li>
-            <li>Команд, которым нужна надежность без ручного контроля</li>
-          </ul>
-        </Card>
-      </section>
-
-      <section className="lead-form" ref={formRef}>
-        <Card className="lead-form-card" view="raised">
-          <h2>Войти в вайтлист</h2>
-          <p>Ответим в течение 2 рабочих дней. Ранние команды получают приоритетный онбординг.</p>
+      <section className="lead-section lead-form" ref={formRef}>
+        <div className="lead-section-label">08</div>
+        <Card className="lead-panel" view="raised">
+          <div className="lead-panel-title">Request Alpha Access</div>
+          <p className="lead-muted">We use this to qualify teams and prioritize onboarding.</p>
           <div className="lead-form-grid">
-            <TextInput size="l" placeholder="Имя" value={leadName} onUpdate={setLeadName} disabled={submitBusy} />
-            <TextInput size="l" placeholder="Рабочий email" value={leadEmail} onUpdate={setLeadEmail} disabled={submitBusy} />
-            <TextInput size="l" placeholder="Компания" value={leadCompany} onUpdate={setLeadCompany} disabled={submitBusy} />
-            <TextInput size="l" placeholder="Роль (опционально)" value={leadRole} onUpdate={setLeadRole} disabled={submitBusy} />
+            <TextInput size="l" placeholder="Contact name" value={leadName} onUpdate={setLeadName} disabled={submitBusy} />
+            <TextInput size="l" placeholder="Work email" value={leadEmail} onUpdate={setLeadEmail} disabled={submitBusy} />
+            <TextInput size="l" placeholder="Team / company" value={leadCompany} onUpdate={setLeadCompany} disabled={submitBusy} />
+            <TextInput size="l" placeholder="Role (optional)" value={leadRole} onUpdate={setLeadRole} disabled={submitBusy} />
             <Select
               size="l"
-              placeholder="Объем задач в месяц"
+              placeholder="Monthly runs (approx)"
               value={leadVolume ? [leadVolume] : []}
               options={[
-                { value: "lt-100", content: "Меньше 100" },
-                { value: "100-1000", content: "100 - 1 000" },
-                { value: "1k-10k", content: "1 000 - 10 000" },
-                { value: "gt-10k", content: "Больше 10 000" }
+                { value: "lt-100", content: "Less than 100" },
+                { value: "100-1000", content: "100 – 1,000" },
+                { value: "1k-10k", content: "1,000 – 10,000" },
+                { value: "gt-10k", content: "More than 10,000" }
               ]}
               onUpdate={(items) => setLeadVolume(String(items[0] ?? ""))}
               disabled={submitBusy}
             />
             <Select
               size="l"
-              placeholder="Когда хотите начать?"
+              placeholder="Would you use human fallback today?"
               value={leadTimeline ? [leadTimeline] : []}
               options={[
-                { value: "now", content: "В этом месяце" },
-                { value: "30d", content: "Через 1–2 месяца" },
-                { value: "90d", content: "Через 3–6 месяцев" },
-                { value: "later", content: "Позже" }
+                { value: "yes", content: "Yes, we need it now" },
+                { value: "maybe", content: "Maybe in the next 1–2 months" },
+                { value: "later", content: "Not yet, but soon" }
               ]}
               onUpdate={(items) => setLeadTimeline(String(items[0] ?? ""))}
               disabled={submitBusy}
@@ -205,7 +299,7 @@ export function LeadPage() {
             <div className="lead-form-wide">
               <TextArea
                 minRows={3}
-                placeholder="Основной кейс использования"
+                placeholder="What does your agent do?"
                 value={leadUsecase}
                 onUpdate={setLeadUsecase}
                 disabled={submitBusy}
@@ -213,8 +307,8 @@ export function LeadPage() {
             </div>
             <div className="lead-form-wide">
               <TextArea
-                minRows={2}
-                placeholder="Контакты или детали (опционально)"
+                minRows={3}
+                placeholder="Where does it fail today?"
                 value={leadContact}
                 onUpdate={setLeadContact}
                 disabled={submitBusy}
@@ -230,18 +324,23 @@ export function LeadPage() {
               />
             </div>
           </div>
-          {submitOk ? <p className="lead-success">Спасибо! Мы свяжемся в ближайшее время.</p> : null}
+          {submitOk ? <p className="lead-success">Thanks — we’ll reach out soon.</p> : null}
           {submitError ? <p className="lead-error">{submitError}</p> : null}
           <div className="lead-form-actions">
             <Button size="l" view="action" onClick={() => void submitLead()} loading={submitBusy} disabled={submitBusy}>
-              Войти в вайтлист
-            </Button>
-            <Button size="l" view="outlined" onClick={() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>
-              Связаться с нами
+              Request Alpha Access
             </Button>
           </div>
         </Card>
       </section>
+
+      <footer className="lead-footer">
+        <div className="lead-footer-inner">
+          <span>Docs</span>
+          <span>Contact</span>
+          <span>Privacy</span>
+        </div>
+      </footer>
     </main>
   );
 }
