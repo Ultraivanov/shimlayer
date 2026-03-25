@@ -1398,6 +1398,9 @@ export function RequesterPage({ pushTask }: Props) {
         <p className="muted" style={{ marginTop: 6 }}>
           Tip: “Open by task ID” jumps directly to a task from webhook payloads or interruptions. Auto-refresh pauses on repeated errors — hit “Resume auto” to recover.
         </p>
+        <p className="muted" style={{ marginTop: 6 }}>
+          Paste a UUID and press Enter to jump directly.
+        </p>
         {showDemo ? (
           <div className="row-tight" style={{ alignItems: "center", flexWrap: "wrap" }}>
             <span className="chip chip-muted">demo</span>
@@ -1408,6 +1411,11 @@ export function RequesterPage({ pushTask }: Props) {
               Create judgment task
             </Button>
           </div>
+        ) : null}
+        {showDemo ? (
+          <p className="muted" style={{ marginTop: 6 }}>
+            Demo creates local sample tasks for walkthroughs.
+          </p>
         ) : null}
         <div className="row-tight">
           <Select

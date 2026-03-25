@@ -725,6 +725,11 @@ export function OperatorPage() {
             </Button>
           </div>
         ) : null}
+        {showDemo ? (
+          <p className="muted" style={{ marginTop: 6 }}>
+            Demo creates local sample tasks for walkthroughs.
+          </p>
+        ) : null}
         <div className="row-tight" style={{ alignItems: "center" }}>
           <TextInput
             size="m"
@@ -752,6 +757,9 @@ export function OperatorPage() {
         </div>
         <p className="muted" style={{ marginTop: 6 }}>
           Tip: use “Open by task ID” for customer‑reported UUIDs or OpenAI interruption tasks.
+        </p>
+        <p className="muted" style={{ marginTop: 6 }}>
+          Paste a UUID and press Enter to jump directly.
         </p>
         <div className="row-tight">
           <Select
