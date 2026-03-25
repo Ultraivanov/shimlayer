@@ -72,7 +72,7 @@ export function LeadPage() {
   }
 
   return (
-    <main className="lead-root lead-grid">
+    <main className="lead-root">
       <header className="lead-nav">
         <div className="lead-nav-inner">
           <div className="lead-brand">
