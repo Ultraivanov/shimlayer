@@ -2976,7 +2976,7 @@ export function OpsPage() {
                 {selectedFlow.callback_url ? (
                   <div className="detail-block" data-testid="ops-webhook-last">
                     <p className="muted" style={{ marginTop: 0 }}>
-                      Webhook delivery
+                      Webhook delivery status
                     </p>
                     {!canViewWebhookDeliveries ? (
                       <p className="muted" style={{ marginBottom: 0 }}>
@@ -2990,7 +2990,7 @@ export function OpsPage() {
                           </p>
                         ) : webhookLast === null ? (
                           <p className="muted" style={{ marginBottom: 0 }}>
-                            no attempts yet
+                            No attempts yet
                           </p>
                         ) : (
                           <div className="row-tight" style={{ alignItems: "center", flexWrap: "wrap" }}>
@@ -3048,7 +3048,7 @@ export function OpsPage() {
                           </Button>
                         </div>
                         <p className="muted" style={{ marginTop: 6, marginBottom: 0 }}>
-                          Resend enqueues a new delivery attempt; refresh or open attempts to see it land.
+                          Resend enqueues a new delivery attempt; refresh or open attempts to see the result.
                         </p>
                       </>
                     )}
@@ -3056,7 +3056,7 @@ export function OpsPage() {
                       <div className="list" style={{ marginTop: 8 }}>
                         {webhookDeliveriesLoading ? <p className="muted">Loading attempts…</p> : null}
                         {!webhookDeliveriesLoading && webhookDeliveries.length === 0 ? (
-                          <p className="muted">No attempts loaded (open again or refresh).</p>
+                          <p className="muted">No attempts loaded yet (try refresh).</p>
                         ) : null}
                         {!webhookDeliveriesLoading && webhookDeliveries.length > 0 ? (
                           <p className="muted mono" style={{ marginTop: 0 }}>
@@ -3143,7 +3143,7 @@ export function OpsPage() {
 
             {inspectorTab === "artifacts" ? (
               <div className="list">
-                {(selectedFlow.artifacts ?? []).length === 0 ? <p className="muted">No artifacts.</p> : null}
+                {(selectedFlow.artifacts ?? []).length === 0 ? <p className="muted">No artifacts yet.</p> : null}
                 {(selectedFlow.artifacts ?? []).map((artifact, idx) => (
                   <ArtifactTile
                     key={`artifact-${idx}`}
