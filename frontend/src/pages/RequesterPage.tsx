@@ -1097,7 +1097,7 @@ export function RequesterPage({ pushTask }: Props) {
         <div className="refund-row">
           <TextInput
             size="l"
-            placeholder="Task ID for refund"
+            placeholder="Task ID for refund (UUID)"
             value={taskIdForRefund}
             onUpdate={setTaskIdForRefund}
           />
@@ -1353,7 +1353,7 @@ export function RequesterPage({ pushTask }: Props) {
             size="m"
             value={taskLookupId}
             onUpdate={setTaskLookupId}
-            placeholder="Open by Task ID (UUID)"
+            placeholder="Open by task ID (UUID)"
             disabled={taskLookupBusy}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -1396,7 +1396,7 @@ export function RequesterPage({ pushTask }: Props) {
           </Button>
         </div>
         <p className="muted" style={{ marginTop: 6 }}>
-          Tip: “Open by Task ID” jumps directly to a task from webhook payloads or interruptions. Auto-refresh pauses on repeated errors — hit “Resume auto” to recover.
+          Tip: “Open by task ID” jumps directly to a task from webhook payloads or interruptions. Auto-refresh pauses on repeated errors — hit “Resume auto” to recover.
         </p>
         {showDemo ? (
           <div className="row-tight" style={{ alignItems: "center", flexWrap: "wrap" }}>

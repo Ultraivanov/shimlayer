@@ -210,7 +210,7 @@ export function OperatorPage() {
     const id = openTaskId.trim();
     if (!id) return;
     if (!isUuidLike(id)) {
-      setError("Invalid Task ID (expected UUID)");
+      setError("Invalid task ID (expected UUID)");
       return;
     }
     if (openTaskBusy) return;
@@ -236,7 +236,7 @@ export function OperatorPage() {
     const id = String(taskId || "").trim();
     if (!id) return;
     if (!isUuidLike(id)) {
-      setError("Invalid Task ID (expected UUID)");
+      setError("Invalid task ID (expected UUID)");
       return;
     }
     setError(null);
@@ -727,7 +727,7 @@ export function OperatorPage() {
             size="m"
             value={openTaskId}
             onUpdate={setOpenTaskId}
-            placeholder="Open by Task ID (UUID)"
+            placeholder="Open by task ID (UUID)"
             disabled={openTaskBusy}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -748,7 +748,7 @@ export function OperatorPage() {
           </Button>
         </div>
         <p className="muted" style={{ marginTop: 6 }}>
-          Tip: use “Open by Task ID” for customer‑reported UUIDs or OpenAI interruption tasks.
+          Tip: use “Open by task ID” for customer‑reported UUIDs or OpenAI interruption tasks.
         </p>
         <div className="row-tight">
           <Select
