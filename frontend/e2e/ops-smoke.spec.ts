@@ -254,7 +254,7 @@ test.describe("Ops smoke", () => {
 		    const taskId = await seedCompletedTask(request, "queue");
 		    await openOps(page);
 		    await waitForFlowRows(page, 1);
-		    await page.getByPlaceholder("Open by Task ID (UUID)").fill(taskId);
+		    await page.getByPlaceholder("Open by Flow ID (UUID)").fill(taskId);
         await page.locator('[data-testid="ops-open-by-id"]').click();
 
 	    await expect(page.locator('[data-testid="ops-flow-inspector"]')).toBeVisible();
@@ -319,7 +319,7 @@ test.describe("Ops smoke", () => {
 
     await openOps(page);
     await waitForFlowRows(page, 1);
-    await page.getByPlaceholder("Search task/account/type/status").fill(taskId);
+    await page.getByPlaceholder("Search flow/account/type/status").fill(taskId);
 
     const targetRow = page.locator(`[data-testid="ops-flow-row"][data-task-id="${taskId}"]`);
     await expect(targetRow).toBeVisible({ timeout: 20_000 });
@@ -368,7 +368,7 @@ test.describe("Ops smoke", () => {
     await waitForFlowRows(page, 2);
 
     // Ensure inspector/action-center is mounted with a selected flow.
-    await page.getByPlaceholder("Open by Task ID (UUID)").fill(taskA);
+    await page.getByPlaceholder("Open by Flow ID (UUID)").fill(taskA);
     await page.locator('[data-testid="ops-open-by-id"]').click();
     await expect(page.locator('[data-testid="ops-flow-inspector"]')).toBeVisible();
     await expect(page.locator('[data-testid="ops-inspector-task-id"]')).toContainText(taskA);
@@ -412,7 +412,7 @@ test.describe("Ops smoke", () => {
     await waitForFlowRows(page, 2);
 
     // Ensure inspector/action-center is mounted with a selected flow.
-    await page.getByPlaceholder("Open by Task ID (UUID)").fill(taskA);
+    await page.getByPlaceholder("Open by Flow ID (UUID)").fill(taskA);
     await page.locator('[data-testid="ops-open-by-id"]').click();
     await expect(page.locator('[data-testid="ops-flow-inspector"]')).toBeVisible();
     await expect(page.locator('[data-testid="ops-inspector-task-id"]')).toContainText(taskA);

@@ -930,7 +930,7 @@ export function OpsPage() {
     const id = openTaskId.trim();
     if (!id) return;
     if (!isUuidLike(id)) {
-      pushToast("error", "Invalid Task ID (expected UUID)");
+      pushToast("error", "Invalid Flow ID (expected UUID)");
       return;
     }
     if (openTaskBusy) return;
@@ -957,7 +957,7 @@ export function OpsPage() {
         setWebhookAttemptsOpen(false);
       }
       setOpenTaskId("");
-      pushToast("success", "Opened task");
+      pushToast("success", "Opened flow");
     } catch (e) {
       pushToast("error", `Open failed: ${String(e)}`);
     } finally {
@@ -2107,7 +2107,7 @@ export function OpsPage() {
             size="m"
             value={openTaskId}
             onUpdate={setOpenTaskId}
-            placeholder="Open by Task ID (UUID)"
+            placeholder="Open by Flow ID (UUID)"
             disabled={openTaskBusy}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -2128,7 +2128,7 @@ export function OpsPage() {
           </Button>
           {pinnedFlowId ? (
             <>
-              <span className="chip chip-muted" title="Inspector is pinned to a specific Task ID (may be outside current filters)">
+              <span className="chip chip-muted" title="Inspector is pinned to a specific Flow ID (may be outside current filters)">
                 pinned
               </span>
               <span className="muted mono">{pinnedFlowId.slice(0, 8)}…</span>
@@ -2351,7 +2351,7 @@ export function OpsPage() {
             size="m"
             value={searchQuery}
             onUpdate={setSearchQuery}
-            placeholder="Search task/account/type/status"
+            placeholder="Search flow/account/type/status"
           />
           <Select
             width="max"
