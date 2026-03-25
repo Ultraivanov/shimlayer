@@ -43,14 +43,21 @@ test.describe("Requester smoke", () => {
     expect(taskId).toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
 
     // Upload local proof artifact
-    await page.locator('[data-testid="requester-artifacts"]').scrollIntoViewIfNeeded();
-    const fileInput = page.locator('[data-testid="requester-upload-file"]').first();
+    const artifactsPanel = page.locator('[data-testid="requester-artifacts"]');
+    await artifactsPanel.scrollIntoViewIfNeeded();
+    await expect(artifactsPanel).toBeVisible({ timeout: 20_000 });
+    const uploadTab = artifactsPanel.getByRole("radio", { name: "Upload file" });
+    await expect(uploadTab).toBeVisible({ timeout: 20_000 });
+    await uploadTab.click();
+    const fileInput = artifactsPanel.locator('[data-testid="requester-upload-file"]').first();
     await fileInput.setInputFiles({
       name: "proof.log",
       mimeType: "text/plain",
       buffer: Buffer.from(`proof for ${taskId}\n${new Date().toISOString()}\n`, "utf-8")
     });
-    await page.getByRole("button", { name: "Upload artifact" }).click();
+    const uploadButton = page.getByRole("button", { name: "Upload artifact" });
+    await expect(uploadButton).toBeEnabled({ timeout: 20_000 });
+    await uploadButton.click();
 
     // Complete (wait for proof present)
     const taskDetailsCard = taskDetails;
