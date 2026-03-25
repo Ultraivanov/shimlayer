@@ -1,7 +1,7 @@
 # Release Summary (ShimLayer MVP)
 
 ## Status
-Core flows are complete and QA‑ready.
+Core flows are complete, QA‑ready, and release‑ready.
 
 ## What’s Done
 - **Requester:** create tasks, proof flow (local + external), Open by ID, auto‑refresh, interruptions.
@@ -10,9 +10,9 @@ Core flows are complete and QA‑ready.
 
 ## Validation
 - `./scripts/preflight_fast.sh` passed (compileall + pytest suites + frontend build).
+- `./scripts/preflight_ui.sh` passed (Playwright UI smoke).
 
 ## Optional Polish (if time)
-- Run UI e2e (`./scripts/preflight_ui.sh`).
 - Final 10–15 min manual click‑through (Requester → Operator → Ops).
 
 ## Release Checklist
