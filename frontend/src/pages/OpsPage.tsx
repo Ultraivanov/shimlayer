@@ -1542,8 +1542,8 @@ export function OpsPage() {
     const noun = mode === "zip" ? "a single zip file" : `${count} zip files`;
     openConfirmDialog(
       {
-        title: "Download many bundles?",
-        message: `You’re about to download ${count} bundle(s) as ${noun}. Continue?`,
+        title: "Confirm bulk download",
+        message: `You’re about to download ${count} bundle(s) as ${noun}. This can take a while.`,
         applyText: mode === "zip" ? `Download 1 zip (${count})` : `Download ${count} files`,
         danger: false
       },
@@ -2803,7 +2803,7 @@ export function OpsPage() {
                         title="Bulk download progress"
                         style={{ whiteSpace: "nowrap" }}
                       >
-                        download {downloadProgress.done}/{downloadProgress.total}
+                        downloaded {downloadProgress.done}/{downloadProgress.total}
                       </span>
                     ) : null}
                     <span className="muted" data-testid="ops-download-helper" style={{ whiteSpace: "nowrap" }}>
