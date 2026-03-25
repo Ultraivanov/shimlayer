@@ -1440,7 +1440,7 @@ export function RequesterPage({ pushTask }: Props) {
           </Button>
         </div>
         <div className="list">
-          {filteredTasks.length === 0 ? <p className="muted">No tasks for selected filters.</p> : null}
+          {filteredTasks.length === 0 ? <p className="muted">No tasks match the current filters.</p> : null}
           {filteredTasks.map((t) => {
             const reviewStatus = t.review?.review_status ? String(t.review.review_status) : "";
             const artifactsCount = Array.isArray(t.artifacts) ? t.artifacts.length : 0;
@@ -1988,7 +1988,7 @@ export function RequesterPage({ pushTask }: Props) {
 	                  </p>
 	                </>
 	              ) : null}
-              {(selectedTask.artifacts ?? []).length === 0 ? <p className="muted">No artifacts.</p> : null}
+              {(selectedTask.artifacts ?? []).length === 0 ? <p className="muted">No artifacts yet.</p> : null}
               {(selectedTask.artifacts ?? []).map((a, idx) => (
                 <ArtifactTile
                   key={`artifact-${idx}`}

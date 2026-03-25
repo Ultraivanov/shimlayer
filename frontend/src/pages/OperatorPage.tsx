@@ -781,7 +781,7 @@ export function OperatorPage() {
           </Button>
         </div>
         <div className="list">
-          {tasks.length === 0 ? <p className="muted">No tasks yet.</p> : null}
+          {tasks.length === 0 ? <p className="muted">No tasks yet. Create a demo task or wait for new ones.</p> : null}
           {filteredTasks.map((t) => (
             <button
               key={t.id}
@@ -803,7 +803,7 @@ export function OperatorPage() {
         <p className="muted" style={{ marginTop: 0 }}>
           Hotkeys: <span className="mono">j/k</span> navigate · <span className="mono">c</span> claim · <span className="mono">p</span> add proof · <span className="mono">Shift+Enter</span> complete
         </p>
-        {!selectedTask ? <p className="muted">Select a task from queue.</p> : null}
+        {!selectedTask ? <p className="muted">Select a task from the queue to view details.</p> : null}
       {selectedTask ? (
           <>
             <p className="muted mono">{selectedTask.id}</p>
@@ -1202,11 +1202,11 @@ export function OperatorPage() {
                 ? "Next: decide Approve/Reject in the OpenAI interruption section."
                 : !isActionable
                   ? "No action needed: task is in a terminal state."
-                  : selectedTask.status === "queued"
-                    ? hasQualityProof
+                : selectedTask.status === "queued"
+                  ? hasQualityProof
                       ? "Next: claim the task to start work."
                       : "Next: upload local proof (recommended) or link external proof."
-                    : hasQualityProof
+                  : hasQualityProof
                       ? "Next: complete the task."
                       : "Next: upload proof to unblock completion."}
             </p>
