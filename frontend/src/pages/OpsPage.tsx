@@ -2148,8 +2148,8 @@ export function OpsPage() {
             </>
           ) : null}
         </div>
-	        {showManualReviewQueue ? (
-	          <div className="row-tight">
+        {showManualReviewQueue ? (
+          <div className="row-tight">
 	            <span className="muted" title="Manual review queue prioritizes unclaimed/expired first, then your claimed, and locks held by others last.">
 	              Order: <span className="mono">unclaimed</span> → <span className="mono">mine</span> → <span className="mono">locked</span>
 	            </span>
@@ -2334,6 +2334,11 @@ export function OpsPage() {
             </Button>
             <span className="muted mono">{manualReviewNav ? `${manualReviewNav.pos}/${manualReviewNav.total}` : "0/0"}</span>
           </div>
+        ) : null}
+        {showManualReviewQueue ? (
+          <p className="muted" style={{ marginTop: 6 }}>
+            Filters are client‑side; claiming happens only via “Take next” or explicit actions.
+          </p>
         ) : null}
         <div className="row-tight">
           <Select
