@@ -2295,7 +2295,7 @@ export function OpsPage() {
                 : "auto-renew: off"}
             </span>
             <span className="muted">
-              Tip: Take next claims the next unclaimed/expired item. Auto-renew only extends locks you own.
+              Tip: Take next claims the next unclaimed/expired item. Auto-renew only extends your locks.
             </span>
             <Button
               view="outlined"
@@ -2325,7 +2325,7 @@ export function OpsPage() {
               Skip
             </Button>
             <Button view="outlined" onClick={selectPrevFlow} disabled={!manualReviewNav?.canPrev || isClaimRunning}>
-              Previous
+              Prev
             </Button>
             <Button view="outlined" onClick={selectNextFlow} disabled={!manualReviewNav?.canNext || isClaimRunning}>
               Next
@@ -2460,10 +2460,10 @@ export function OpsPage() {
             onUpdate={(items) => setPageSize(Number(items[0] ?? "25"))}
           />
         </div>
-        <p className="muted" data-testid="ops-selected-count">Selected: {selectedTaskIds.length}</p>
+        <p className="muted" data-testid="ops-selected-count">Selected {selectedTaskIds.length}</p>
         <div className={flowQueueView === "tiles" ? "flow-grid" : "list"} data-testid="ops-flow-list">
           {isRefreshing && pagedFlows.length === 0 ? <p className="muted">Loading flows…</p> : null}
-          {!isRefreshing && pagedFlows.length === 0 ? <p className="muted">No flows for selected filter.</p> : null}
+          {!isRefreshing && pagedFlows.length === 0 ? <p className="muted">No flows match the current filters.</p> : null}
           {pagedFlows.map((t) => {
             const checked = selectedTaskIds.includes(t.id);
             const review = (t as unknown as { review?: { review_status?: string; auto_check_provider?: string; auto_check_model?: string | null; auto_check_score?: number; auto_check_reason?: string | null; auto_check_redacted?: boolean | null; claimed_by?: string | null; claimed_until?: string | null } }).review;
@@ -2925,7 +2925,7 @@ export function OpsPage() {
             </div>
           ) : null}
         </div>
-        {!selectedFlow ? <p className="muted">Select a flow from queue.</p> : null}
+        {!selectedFlow ? <p className="muted">Select a flow from the queue to view details.</p> : null}
         {selectedFlow ? (
           <div className="inspector-wrap">
             <div className="row-tight">
