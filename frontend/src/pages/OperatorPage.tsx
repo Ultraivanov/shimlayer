@@ -956,7 +956,7 @@ export function OperatorPage() {
             {!isActionable ? <p className="muted">This task is not actionable (terminal state).</p> : null}
             {isActionable && !hasQualityProof && !isOpenAiInterruptionTask ? (
               <p className="muted">
-                Completion requires quality proof. Upload a local file (recommended) or register an external proof with <span className="mono">checksum_sha256</span>.
+                Completion requires quality proof. Add one below (local upload recommended).
               </p>
             ) : null}
             {isActionable && !hasQualityProof && !isOpenAiInterruptionTask ? (
@@ -967,7 +967,7 @@ export function OperatorPage() {
                   disabled={isWorking}
                   loading={isWorking}
                   onClick={() => void addProof()}
-                  title="Upload local proof artifact (quality proof)"
+                  title="Upload local proof artifact (recommended, quality proof)"
                 >
                   Upload local proof
                 </Button>
@@ -1009,7 +1009,7 @@ export function OperatorPage() {
               </div>
               <div className={`callout ${proofWouldBeQuality ? "callout-ok" : "callout-warn"}`} style={{ marginTop: 8 }}>
                 <p className="muted">
-                  To unblock completion, provide a valid <span className="mono">checksum_sha256</span> (unless <span className="mono">storage_path</span> is <span className="mono">local:</span>).
+                  To unblock completion, provide a valid <span className="mono">checksum_sha256</span> (unless <span className="mono">storage_path</span> is <span className="mono">local:</span>, which auto-fills it).
                 </p>
               </div>
               <p className="muted" style={{ marginTop: 6 }}>
@@ -1062,8 +1062,8 @@ export function OperatorPage() {
 	                  onClick={() => void registerProofMetadata()}
 	                  data-testid="operator-register-proof"
 	                >
-	                  {proofWouldBeQuality ? "Register proof" : proofAllowMetadataOnly ? "Register metadata (won’t unblock)" : "Add checksum to register"}
-	                </Button>
+                  {proofWouldBeQuality ? "Register proof" : proofAllowMetadataOnly ? "Register metadata (does not unblock)" : "Add checksum to register"}
+                </Button>
               </div>
               {proofAdvancedOpen || proofAllowMetadataOnly || proofMetadataJson.trim() !== "{}" ? (
                 <div style={{ marginTop: 8 }}>
@@ -1092,7 +1092,7 @@ export function OperatorPage() {
                       onChange={(e) => setProofAllowMetadataOnly(e.currentTarget.checked)}
                       disabled={proofBusy}
                     />
-                    Allow metadata-only registration (won’t unblock completion)
+                    Allow metadata-only registration (does not unblock completion)
                   </label>
                 ) : null
               ) : null}
@@ -1143,7 +1143,7 @@ export function OperatorPage() {
                         title="Use this artifact’s storage_path/checksum/metadata to prefill the proof form"
                         data-testid="operator-artifact-use-for-proof"
                       >
-                        Use for proof
+                        Use as template
                       </Button>
                     }
                     notify={(level, message) => {

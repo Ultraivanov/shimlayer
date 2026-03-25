@@ -1498,7 +1498,7 @@ export function RequesterPage({ pushTask }: Props) {
                       document.querySelector('[data-testid="requester-artifacts"]')?.scrollIntoView({ behavior: "smooth", block: "start" });
                     }, 0);
                   }}
-                  title="Completion requires quality proof. Upload a local artifact or register external proof with checksum_sha256."
+                  title="Completion requires quality proof. Upload a local artifact or link external proof with checksum_sha256."
                 >
                   Add proof
                 </Button>
@@ -1724,7 +1724,7 @@ export function RequesterPage({ pushTask }: Props) {
                   minRows={2}
                 />
                 <p className="muted" style={{ marginTop: 6 }}>
-                  Completion requires quality proof: at least one artifact with `local:` storage or a valid `checksum_sha256`.
+                  Completion requires quality proof. Add one below (local upload recommended).
                 </p>
                 {!hasQualityProof ? (
                   <div className="row-tight" style={{ marginTop: 8, flexWrap: "wrap" }}>
@@ -1738,7 +1738,7 @@ export function RequesterPage({ pushTask }: Props) {
                           document.querySelector('[data-testid="requester-artifacts"]')?.scrollIntoView({ behavior: "smooth", block: "start" });
                         }, 0);
                       }}
-                      title="Upload a local artifact (recommended)"
+                      title="Upload a local artifact (recommended, counts as quality proof)"
                     >
                       Upload local proof
                     </Button>
@@ -1752,7 +1752,7 @@ export function RequesterPage({ pushTask }: Props) {
                           document.querySelector('[data-testid="requester-artifacts"]')?.scrollIntoView({ behavior: "smooth", block: "start" });
                         }, 0);
                       }}
-                      title="Link external proof (requires checksum_sha256 to unblock completion)"
+                      title="Register external proof link (requires checksum_sha256 to unblock completion)"
                     >
                       Link external proof
                     </Button>
@@ -1890,7 +1890,7 @@ export function RequesterPage({ pushTask }: Props) {
                               onChange={(e) => setProofAllowMetadataOnly(e.currentTarget.checked)}
                               disabled={proofBusy}
                             />
-                            Allow metadata-only link (won’t unblock completion)
+                            Allow metadata-only link (does not unblock completion)
                           </label>
                         ) : null}
                         <div style={{ marginTop: 6 }}>
@@ -1912,15 +1912,13 @@ export function RequesterPage({ pushTask }: Props) {
                       </p>
                     ) : null}
 	                  <p className="muted" style={{ marginTop: 6 }}>
-	                    Tip: if <span className="mono">storage_path</span> starts with <span className="mono">local:</span>, the server can verify/fill <span className="mono">checksum_sha256</span>.
+                    Tip: if <span className="mono">storage_path</span> starts with <span className="mono">local:</span>, the server can verify/fill <span className="mono">checksum_sha256</span> automatically.
 	                  </p>
 	                  <p className="muted" style={{ marginTop: 6 }}>
 	                    Quality proof: <span className="mono">{proofWouldBeQuality ? "yes" : "no"}</span>{" "}
-	                    {!proofWouldBeQuality ? (
-	                      <span className="muted">
-	                        · add a valid checksum (sha256) or use a `local:` artifact
-	                      </span>
-	                    ) : null}
+                    {!proofWouldBeQuality ? (
+                      <span className="muted">· add a valid checksum (sha256) or use a `local:` artifact</span>
+                    ) : null}
 	                  </p>
 	                </div>
 	              ) : null}
@@ -2015,7 +2013,7 @@ export function RequesterPage({ pushTask }: Props) {
                   extraActions={
                     String((a as any)?.storage_path ?? "").startsWith("local:") ? null : (
                       <Button size="s" view="flat" onClick={() => prefillProofFromArtifact(a)} data-testid="artifact-register-proof">
-                        Use for register
+                        Use as template
                       </Button>
                     )
                   }

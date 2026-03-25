@@ -499,6 +499,67 @@ export function OpsPage() {
     return formatRemaining(ms);
   }, [manualReviewClaimState.active, manualReviewClaimState.claimedUntilMs, nowMs]);
   const recentTrend = useMemo(() => metricsHistory.slice(-trendWindow), [metricsHistory, trendWindow]);
+  const activeFlowPreset = useMemo(() => {
+    const baseClear =
+      !statusFilter &&
+      !taskTypeFilter &&
+      !searchQuery &&
+      !showOnlyProblem &&
+      !showSlaBreachQueue &&
+      !showManualReviewQueue &&
+      manualReviewFocus === "queue";
+    if (
+      showManualReviewQueue &&
+      !statusFilter &&
+      !taskTypeFilter &&
+      !searchQuery &&
+      !showOnlyProblem &&
+      !showSlaBreachQueue &&
+      manualReviewFocus === "queue"
+    ) {
+      return "manual_review";
+    }
+    if (
+      statusFilter === "disputed" &&
+      !taskTypeFilter &&
+      !searchQuery &&
+      !showOnlyProblem &&
+      !showSlaBreachQueue &&
+      !showManualReviewQueue
+    ) {
+      return "disputed";
+    }
+    if (
+      showOnlyProblem &&
+      showSlaBreachQueue &&
+      !statusFilter &&
+      !taskTypeFilter &&
+      !searchQuery &&
+      !showManualReviewQueue
+    ) {
+      return "overdue";
+    }
+    if (
+      !showOnlyProblem &&
+      showSlaBreachQueue &&
+      !statusFilter &&
+      !taskTypeFilter &&
+      !searchQuery &&
+      !showManualReviewQueue
+    ) {
+      return "sla_risk";
+    }
+    if (baseClear) return "clear";
+    return "";
+  }, [
+    manualReviewFocus,
+    searchQuery,
+    showManualReviewQueue,
+    showOnlyProblem,
+    showSlaBreachQueue,
+    statusFilter,
+    taskTypeFilter
+  ]);
   const healthState = useMemo(() => {
     if (!metrics) return { level: "stable", title: "System status unavailable", hint: "Waiting for first metrics sample." };
     if (metrics.tasks_overdue >= 5 || metrics.webhook_dlq_count >= 10) {
@@ -2333,22 +2394,28 @@ export function OpsPage() {
 	          >
 	            Export JSON
 	          </Button>
-	        </div>
+        </div>
         <div className="row-tight">
           <span className="muted">Presets:</span>
-          <Button view="outlined" onClick={() => applyFlowPreset("overdue")}>
+          <Button view={activeFlowPreset === "overdue" ? "action" : "outlined"} onClick={() => applyFlowPreset("overdue")}>
             Only overdue{typeof metrics?.tasks_overdue === "number" ? ` (${metrics.tasks_overdue})` : ""}
           </Button>
-          <Button view="outlined" onClick={() => applyFlowPreset("disputed")}>
+          <Button view={activeFlowPreset === "disputed" ? "action" : "outlined"} onClick={() => applyFlowPreset("disputed")}>
             Disputed{typeof (metrics?.task_status_counts?.disputed) === "number" ? ` (${metrics.task_status_counts.disputed})` : ""}
           </Button>
-          <Button view="outlined" onClick={() => applyFlowPreset("sla_risk")}>
+          <Button view={activeFlowPreset === "sla_risk" ? "action" : "outlined"} onClick={() => applyFlowPreset("sla_risk")}>
             SLA risk{typeof metrics?.tasks_sla_risk === "number" ? ` (${metrics.tasks_sla_risk})` : ""}
           </Button>
-          <Button view="outlined" data-testid="ops-preset-manual-review" onClick={() => applyFlowPreset("manual_review")}>
+          <Button
+            view={activeFlowPreset === "manual_review" ? "action" : "outlined"}
+            data-testid="ops-preset-manual-review"
+            onClick={() => applyFlowPreset("manual_review")}
+          >
             Manual review{typeof metrics?.manual_review_pending === "number" ? ` (${metrics.manual_review_pending})` : ""}
           </Button>
-          <Button view="flat" onClick={() => applyFlowPreset("clear")}>Reset</Button>
+          <Button view={activeFlowPreset === "clear" ? "action" : "flat"} onClick={() => applyFlowPreset("clear")}>
+            Reset
+          </Button>
           <span className="muted" style={{ marginLeft: 8 }}>View:</span>
           <Button view={flowQueueView === "list" ? "action" : "outlined"} onClick={() => setFlowQueueView("list")}>List</Button>
           <Button view={flowQueueView === "tiles" ? "action" : "outlined"} onClick={() => setFlowQueueView("tiles")}>Tiles</Button>
