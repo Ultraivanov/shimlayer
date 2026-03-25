@@ -3075,6 +3075,9 @@ export function OpsPage() {
                         <p className="muted" style={{ marginTop: 6, marginBottom: 0 }}>
                           Resend enqueues a new delivery attempt; refresh or open attempts to see the result.
                         </p>
+                        <p className="muted" style={{ marginTop: 4, marginBottom: 0 }}>
+                          Resend uses the current callback URL.
+                        </p>
                       </>
                     )}
                     {webhookAttemptsOpen && canViewWebhookDeliveries ? (
