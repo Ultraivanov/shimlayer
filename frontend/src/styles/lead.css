@@ -70,6 +70,14 @@
   grid-column: 1 / span 4;
 }
 
+.lead-nav-right {
+  grid-column: 6 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+}
+
 .lead-brand-mark {
   width: 18px;
   height: 18px;
@@ -85,12 +93,19 @@
   display: flex;
   gap: 16px;
   font-size: 13px;
-  grid-column: 5 / span 4;
+  align-items: center;
+}
+
+.lead-nav-links a {
+  margin-right: 16px;
+}
+
+.lead-nav-links a:last-child {
+  margin-right: 0;
 }
 
 .lead-nav-cta {
-  grid-column: 9 / -1;
-  justify-self: end;
+  font-size: 13px;
 }
 
 .lead-section {
@@ -495,12 +510,12 @@
     row-gap: 12px;
   }
   .lead-brand,
-  .lead-nav-links,
-  .lead-nav-cta {
+  .lead-nav-right {
     grid-column: 1 / -1;
   }
-  .lead-nav-cta {
+  .lead-nav-right {
     justify-self: start;
+    flex-wrap: wrap;
   }
   .lead-footer-inner {
     padding: 0 24px;

@@ -79,14 +79,19 @@ export function LeadPage() {
             <span className="lead-brand-mark" />
             <span className="lead-brand-name">ShimLayer</span>
           </div>
-          <nav className="lead-nav-links">
-            <a href="#how">How it works</a>
-            <a href="#scope">Scope</a>
-            <a href="#pricing">Pricing</a>
-            <a href="#alpha">Alpha</a>
-          </nav>
-          <div className="lead-nav-cta">
-            <Button size="m" view="action" onClick={() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+          <div className="lead-nav-right">
+            <nav className="lead-nav-links">
+              <a href="#how">How it works</a>
+              <a href="#scope">Scope</a>
+              <a href="#pricing">Pricing</a>
+              <a href="#alpha">Alpha</a>
+            </nav>
+            <Button
+              size="m"
+              view="action"
+              className="lead-nav-cta"
+              onClick={() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            >
               Request Alpha Access
             </Button>
           </div>
