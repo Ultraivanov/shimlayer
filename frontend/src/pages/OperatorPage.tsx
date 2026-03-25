@@ -1013,7 +1013,7 @@ export function OperatorPage() {
                 </p>
               </div>
               <p className="muted" style={{ marginTop: 6 }}>
-                Quality proof = local upload or checksum-verified external proof. Required before completing the task.
+                Quality proof is required to complete. Use local upload or an external link with a valid checksum.
               </p>
               <div className="row-tight" style={{ alignItems: "center" }}>
                 <Select
@@ -1065,6 +1065,9 @@ export function OperatorPage() {
                   {proofWouldBeQuality ? "Register proof" : proofAllowMetadataOnly ? "Register metadata (does not unblock)" : "Add checksum to register"}
                 </Button>
               </div>
+              <p className="muted" style={{ marginTop: 4 }}>
+                To count as quality proof, include <span className="mono">checksum_sha256</span> (or use a <span className="mono">local:</span> path).
+              </p>
               {proofAdvancedOpen || proofAllowMetadataOnly || proofMetadataJson.trim() !== "{}" ? (
                 <div style={{ marginTop: 8 }}>
                   <TextArea

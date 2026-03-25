@@ -1914,6 +1914,9 @@ export function OpsPage() {
             </Button>
           </div>
         </div>
+        <p className="muted" style={{ marginTop: 6 }}>
+          Auto-refresh pauses on repeated errors; use “Resume auto” to recover.
+        </p>
         <div className="metric-grid tower-grid">
           <button
             type="button"
@@ -2416,8 +2419,26 @@ export function OpsPage() {
             Reset
           </Button>
           <span className="muted" style={{ marginLeft: 8 }}>View:</span>
-          <Button view={flowQueueView === "list" ? "action" : "outlined"} onClick={() => setFlowQueueView("list")}>List</Button>
-          <Button view={flowQueueView === "tiles" ? "action" : "outlined"} onClick={() => setFlowQueueView("tiles")}>Tiles</Button>
+          <div className="segmented" role="radiogroup" aria-label="Flow view">
+            <button
+              type="button"
+              className={`segmented-btn ${flowQueueView === "list" ? "is-active" : ""}`}
+              role="radio"
+              aria-checked={flowQueueView === "list"}
+              onClick={() => setFlowQueueView("list")}
+            >
+              List
+            </button>
+            <button
+              type="button"
+              className={`segmented-btn ${flowQueueView === "tiles" ? "is-active" : ""}`}
+              role="radio"
+              aria-checked={flowQueueView === "tiles"}
+              onClick={() => setFlowQueueView("tiles")}
+            >
+              Tiles
+            </button>
+          </div>
         </div>
         <div className="row-tight">
           <TextInput

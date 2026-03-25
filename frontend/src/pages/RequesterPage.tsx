@@ -1567,7 +1567,7 @@ export function RequesterPage({ pushTask }: Props) {
               ? "No action needed: task is in a terminal state."
               : hasQualityProof
                 ? "Next: complete the task."
-                : "Next: add proof (local upload recommended) to unblock completion."}
+                : "Next: add quality proof (local upload recommended) to unlock completion."}
           </p>
         ) : null}
         {selectedTask && showDebug ? (
@@ -1601,9 +1601,9 @@ export function RequesterPage({ pushTask }: Props) {
               <p><strong>Type:</strong> {selectedTask.task_type}</p>
               <p><strong>Review:</strong> {selectedTask.review?.review_status ?? "none"}</p>
               <p>
-                <strong>Proof:</strong>{" "}
+                <strong>Quality proof:</strong>{" "}
                 {hasQualityProof ? (
-                  <span className="chip chip-ok">quality present</span>
+                  <span className="chip chip-ok">present</span>
                 ) : (
                   <span className="chip chip-warn">missing</span>
                 )}
@@ -1800,6 +1800,9 @@ export function RequesterPage({ pushTask }: Props) {
                   <span className="muted mono">artifacts {selectedTask.artifacts?.length ?? 0}</span>
                 </span>
 	              </div>
+                <p className="muted" style={{ marginTop: 4 }}>
+                  Choose how to attach proof for this task. Local uploads are fastest to complete.
+                </p>
                 <p className="muted" style={{ marginTop: 6 }}>
                   Quality proof = local upload or a valid <span className="mono">checksum_sha256</span>. Completion is blocked until it’s present.
                 </p>
@@ -1880,6 +1883,9 @@ export function RequesterPage({ pushTask }: Props) {
 		                      {proofWouldBeQuality ? "Register proof" : proofAllowMetadataOnly ? "Register metadata (won’t unblock)" : "Add checksum to register"}
 		                    </Button>
 	                  </div>
+                    <p className="muted" style={{ marginTop: 4 }}>
+                      To count as quality proof, provide <span className="mono">checksum_sha256</span> (or use a <span className="mono">local:</span> path).
+                    </p>
                     {proofAdvancedOpen || proofAllowMetadataOnly || proofMetadataJson.trim() !== "{}" ? (
                       <>
                         {!proofWouldBeQuality ? (
@@ -1984,7 +1990,7 @@ export function RequesterPage({ pushTask }: Props) {
 	                    Upload only proof-safe artifacts (avoid secrets/PII unless required and permitted).
 	                  </p>
 	                  <p className="muted" style={{ marginTop: 6 }}>
-	                    Uploads are stored as <span className="mono">local:</span> and count as quality proof (recommended).
+	                    Uploads are stored as <span className="mono">local:</span> and count as quality proof automatically (recommended).
 	                  </p>
 	                </>
 	              ) : null}
