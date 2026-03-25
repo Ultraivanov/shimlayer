@@ -1885,7 +1885,7 @@ export function OpsPage() {
                       ? `(paused ${formatDurationShort(remainingMs)})`
                       : isPageVisible
                         ? ""
-                        : "(paused)";
+                        : "(tab hidden)";
                 const hint = remainingMs > 0 && autoRefreshLastError ? ` · ${autoRefreshLastError}` : "";
                 return (
                   <span title={autoRefreshLastError || undefined}>
@@ -1900,7 +1900,7 @@ export function OpsPage() {
             <Button view={autoRefreshSeconds === 60 ? "action" : "outlined"} onClick={() => setAutoRefreshSeconds(60)}>60s</Button>
             {autoRefreshSeconds !== 0 && autoRefreshPausedUntilMs > nowMs ? (
               <Button view="flat" onClick={resetAutoRefreshPause}>
-                Resume
+                Resume auto
               </Button>
             ) : null}
             <Button
@@ -2262,7 +2262,7 @@ export function OpsPage() {
                 ? "queue: off"
                 : manualQueuePausedUntilMs && nowMs < manualQueuePausedUntilMs
                   ? `queue: paused ${formatRemaining(manualQueuePausedUntilMs - nowMs)} (${manualQueueAutoRefreshSeconds}s)`
-                  : `queue: ${manualQueueAutoRefreshSeconds}s`}
+                  : `queue: every ${manualQueueAutoRefreshSeconds}s`}
               {manualQueueAutoRefreshSeconds !== 0 && manualQueuePausedUntilMs && nowMs < manualQueuePausedUntilMs && manualQueueLastError
                 ? ` · ${shortError(manualQueueLastError, 60)}`
                 : ""}
@@ -2270,7 +2270,7 @@ export function OpsPage() {
             </span>
             {manualQueueAutoRefreshSeconds !== 0 && manualQueuePausedUntilMs && nowMs < manualQueuePausedUntilMs ? (
               <Button view="flat" size="s" onClick={resetManualQueueAutoRefreshPause}>
-                Resume
+                Resume queue
               </Button>
             ) : null}
             <span
