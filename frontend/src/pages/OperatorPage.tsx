@@ -751,6 +751,7 @@ export function OperatorPage() {
             loading={openTaskBusy}
             onClick={() => void openById()}
             data-testid="operator-open-by-id"
+            title={openTaskId.trim() ? "Open the task by UUID" : "Enter a task UUID to open"}
           >
             Open
           </Button>

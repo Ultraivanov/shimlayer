@@ -1362,7 +1362,14 @@ export function RequesterPage({ pushTask }: Props) {
               }
             }}
           />
-          <Button view="outlined" size="m" disabled={taskLookupBusy || !taskLookupId.trim()} loading={taskLookupBusy} onClick={() => void lookupTaskById()}>
+          <Button
+            view="outlined"
+            size="m"
+            disabled={taskLookupBusy || !taskLookupId.trim()}
+            loading={taskLookupBusy}
+            onClick={() => void lookupTaskById()}
+            title={taskLookupId.trim() ? "Open the task by UUID" : "Enter a task UUID to open"}
+          >
             Open
           </Button>
           <Select
