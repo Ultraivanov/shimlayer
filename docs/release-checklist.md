@@ -1,52 +1,47 @@
-# Release Checklist (MVP)
+# Release Checklist (ShimLayer)
 
-## 1. Prepare environment
-- Ensure Python, npm, and Docker are installed.
-- Ensure required env vars are set (`SHIMLAYER_*`, `VITE_*`).
-- Ensure admin headers are configured for Ops/API checks.
- - Review `docs/security-notes.md`.
+## 1) Backend Preflight
+- Run: `./scripts/preflight_fast.sh`
+- Expect: all tests pass, frontend build passes.
 
-## 2. Fast code health
-```bash
-./scripts/preflight_fast.sh
-```
-Expected: `Fast preflight PASSED.`
+## 2) Frontend Build (standalone)
+- Run:
+  - `cd frontend`
+  - `npm install`
+  - `npm run build`
 
-## 3. Frontend + UI smoke
-```bash
-./scripts/preflight_ui.sh
-```
-Expected: `UI preflight PASSED.`
-Note: In some sandboxed environments Playwright may be skipped if localhost binds are restricted. For release, run on a normal machine/CI runner where `127.0.0.1:8000` binds are permitted so UI smoke actually executes.
-Tip: enforce this in CI by running `SHIMLAYER_STRICT_UI_SMOKE=1 ./scripts/preflight_ui.sh`.
+## 3) Environment & Secrets
+- Verify API keys (requester + admin)
+- Verify `SHIMLAYER_DB_DSN` (or Supabase connection)
+- Verify webhook signing/secret config if used
+- Confirm admin role headers are set for Ops UI
 
-## 4. Full local preflight (with Postgres)
-```bash
-./scripts/preflight_all.sh --with-docker
-```
-Expected: all internal steps pass.
-Tip: enforce Docker availability by running `SHIMLAYER_STRICT_DOCKER=1 ./scripts/preflight_local.sh`.
-Tip: for a single strict gate, run `./scripts/preflight_strict.sh`.
-Tip: `./scripts/preflight_all.sh --strict` is equivalent to running the strict gate.
+## 4) Database Migration (new env)
+- Apply schema: `docs/supabase-schema-v0.sql`
+- If reusing an existing DB, ensure new tables are present:
+  - `ops_metrics_history`
+  - `leads`
+  - `openai_interruptions`
 
-## 5. API readiness + observability probes
-```bash
-curl -sS http://localhost:8000/v1/healthz
-curl -sS http://localhost:8000/v1/readyz
-curl -sS http://localhost:8000/v1/ops/observability/metrics \
-  -H "X-API-Key: demo-key" \
-  -H "X-Admin-Key: dev-admin-key" \
-  -H "X-Admin-Role: admin" \
-  -H "X-Admin-User: ops-user"
-```
-Expected: `healthz=ok`, `readyz=ready`, Prometheus text returned.
+## 5) Smoke UI (optional but recommended)
+- Run:
+  - `cd frontend`
+  - `npm run e2e`
 
-## 6. Final manual spot-check
-- Open Ops tab and verify queue, action center, incident board, DLQ panel.
-- Open Requester/Operator tabs and spot-check OpenAI interruptions (ingest → decide → resume payload).
-- Run one safe action (`add_note`) and verify audit/timeline update.
-- Confirm no unexpected 4xx/5xx in API logs.
+## 6) Manual Quick Check (5–10 minutes)
+- Requester:
+  - Create task → upload proof → complete
+  - Open by Task ID works
+- Operator:
+  - Claim → add proof → complete
+  - Interruption task path (Approve/Reject)
+- Ops:
+  - Queue filters/presets
+  - Inspector tabs
+  - Webhook resend + attempts
+  - Bulk download (multi + zip)
 
-## 7. Go / No-Go decision
-- `GO` only if all checks pass.
-- If any step fails: `NO-GO`, capture failing command output and fix before retry.
+## 7) Post‑deploy Quick Checks
+- Health endpoint responds
+- Requester/Operator/Ops pages load
+- Auto‑refresh runs without errors
