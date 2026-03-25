@@ -682,7 +682,7 @@ export function OperatorPage() {
                 ? `(paused ${formatDurationShort(autoRefreshPausedUntilMs - nowMs)})`
                 : isPageVisible
                   ? ""
-                  : "(paused)"}
+                  : "(tab hidden)"}
               {autoRefreshSeconds !== 0 && autoRefreshPausedUntilMs > nowMs && autoRefreshLastError
                 ? ` · ${autoRefreshLastError}`
                 : ""}
@@ -711,6 +711,9 @@ export function OperatorPage() {
             </Button>
           </div>
         </div>
+        <p className="muted" style={{ marginTop: 6 }}>
+          Auto-refresh pauses on repeated errors — use “Resume auto” to recover.
+        </p>
         {showDemo ? (
           <div className="row-tight" style={{ alignItems: "center", flexWrap: "wrap" }}>
             <span className="chip chip-muted">demo</span>
