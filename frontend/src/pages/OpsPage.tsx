@@ -2895,7 +2895,7 @@ export function OpsPage() {
                         title="Bulk download progress"
                         style={{ whiteSpace: "nowrap" }}
                       >
-                        downloaded {downloadProgress.done}/{downloadProgress.total}
+                        progress: {downloadProgress.mode === "zip" ? "zip" : "files"} {downloadProgress.done}/{downloadProgress.total}
                       </span>
                     ) : null}
                     <span className="muted" data-testid="ops-download-helper" style={{ whiteSpace: "nowrap" }}>
