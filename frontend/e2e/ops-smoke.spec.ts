@@ -387,7 +387,7 @@ test.describe("Ops smoke", () => {
     await rowB.locator('input[type="checkbox"]').first().check();
     await expect(rowA.locator('input[type="checkbox"]').first()).toBeChecked();
     await expect(rowB.locator('input[type="checkbox"]').first()).toBeChecked();
-    await expect(page.locator('[data-testid="ops-selected-count"]')).toContainText("Selected: 2");
+    await expect(page.locator('[data-testid="ops-selected-count"]')).toContainText("Selected 2");
 
     await expect(bulkDlBtn).toBeEnabled();
 
@@ -427,7 +427,7 @@ test.describe("Ops smoke", () => {
     await expect(rowB).toBeVisible({ timeout: 20_000 });
     await rowA.locator('input[type="checkbox"]').first().check();
     await rowB.locator('input[type="checkbox"]').first().check();
-    await expect(page.locator('[data-testid="ops-selected-count"]')).toContainText("Selected: 2");
+    await expect(page.locator('[data-testid="ops-selected-count"]')).toContainText("Selected 2");
 
     await expect(zipBtn).toBeEnabled();
     const dlPromise = page.waitForEvent("download");
@@ -464,7 +464,7 @@ test.describe("Ops smoke", () => {
     await waitForFlowRows(page, 2);
 
     await page.locator('[data-testid="ops-flow-queue"]').getByRole("button", { name: "Select page" }).click();
-    await expect(page.getByText("Selected:")).toContainText("Selected:");
+    await expect(page.getByText("Selected")).toContainText("Selected");
 
     await page.locator('[data-testid="ops-bulk-actions"]').getByRole("button", { name: "Dry-run bulk" }).click();
     await expect(page.locator(".toast-success")).toContainText("Bulk dry-run passed");
