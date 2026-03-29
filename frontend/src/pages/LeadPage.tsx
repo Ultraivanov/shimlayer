@@ -272,6 +272,20 @@ if stuck or low_confidence:
                 <span className="lead-chip">REASON CODES</span>
                 <span className="lead-chip">TRACE</span>
               </div>
+              <div className="lead-trust-row">
+                <div className="lead-trust-item">
+                  <span className="lead-trust-label">SLA</span>
+                  <span className="lead-trust-value">1–3 min response window</span>
+                </div>
+                <div className="lead-trust-item">
+                  <span className="lead-trust-label">Privacy</span>
+                  <span className="lead-trust-value">PII‑safe redaction available</span>
+                </div>
+                <div className="lead-trust-item">
+                  <span className="lead-trust-label">Delivery</span>
+                  <span className="lead-trust-value">Push + pull webhook modes</span>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -300,11 +314,38 @@ if stuck or low_confidence:
               <p className="lead-muted">
                 Early alpha, limited capacity, manual onboarding, and a direct feedback loop with the founders.
               </p>
+              <div className="lead-cta-inline">
+                <Button size="m" view="action" onClick={() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+                  Request Alpha Access
+                </Button>
+                <span className="lead-muted">We typically onboard within 2–5 days.</span>
+              </div>
+            </div>
+          </section>
+
+          <section className="lead-section lead-faq">
+            <div className="lead-section-label">08</div>
+            <div className="lead-block">
+              <div className="lead-block-title">FAQ</div>
+              <div className="lead-faq-grid">
+                <div>
+                  <div className="lead-faq-q">Do we need to change our agent stack?</div>
+                  <div className="lead-faq-a">No. ShimLayer sits at the recovery boundary and accepts context via API.</div>
+                </div>
+                <div>
+                  <div className="lead-faq-q">What does a human see?</div>
+                  <div className="lead-faq-a">Only the minimal state you send: logs, snapshots, and the specific decision.</div>
+                </div>
+                <div>
+                  <div className="lead-faq-q">How fast is response?</div>
+                  <div className="lead-faq-a">Typical turnaround is 1–3 minutes, with SLA options for priority queues.</div>
+                </div>
+              </div>
             </div>
           </section>
 
           <section className="lead-section lead-form" ref={formRef}>
-            <div className="lead-section-label">08</div>
+            <div className="lead-section-label">09</div>
             <div className="lead-block">
               <div className="lead-block-title">Request Alpha Access</div>
               <p className="lead-muted">We use this to qualify teams and prioritize onboarding.</p>

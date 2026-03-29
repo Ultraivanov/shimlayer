@@ -435,9 +435,67 @@
   margin-top: 12px;
 }
 
+.lead-trust-row {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.lead-trust-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.55);
+  font-family: "Inter", "IBM Plex Mono", ui-sans-serif, system-ui;
+}
+
+.lead-trust-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #a5b4fc;
+}
+
+.lead-trust-value {
+  font-size: 13px;
+  color: #cbd5f5;
+}
+
 .lead-muted {
   color: #94a3b8;
   margin: 0;
+}
+
+.lead-cta-inline {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.lead-faq-grid {
+  margin-top: 14px;
+  display: grid;
+  gap: 16px;
+}
+
+.lead-faq-q {
+  color: #e2e8f0;
+  font-size: 14px;
+  margin-bottom: 6px;
+  font-family: "Inter", "IBM Plex Mono", ui-sans-serif, system-ui;
+}
+
+.lead-faq-a {
+  color: #cbd5f5;
+  font-size: 13px;
+  line-height: 1.6;
+  font-family: "Inter", "IBM Plex Mono", ui-sans-serif, system-ui;
 }
 
 .lead-pricing-grid {
