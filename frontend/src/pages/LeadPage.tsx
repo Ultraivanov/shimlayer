@@ -172,7 +172,7 @@ if stuck or low_confidence or risky_action:
             <div className="lead-section-label">01</div>
             <div className="lead-audience-grid">
               <div className="lead-block">
-                <div className="lead-block-title">This is for</div>
+                <div className="lead-block-title">For</div>
                 <ul className="lead-list">
                   <li>Teams running agents in production or close to it</li>
                   <li>Infra‑minded founders shipping autonomous workflows</li>
@@ -180,7 +180,7 @@ if stuck or low_confidence or risky_action:
                 </ul>
               </div>
               <div className="lead-block">
-                <div className="lead-block-title">This is not for</div>
+                <div className="lead-block-title">Not for</div>
                 <ul className="lead-list">
                   <li>Prompt playgrounds or demo‑only experiments</li>
                   <li>General consumer AI curiosity traffic</li>
@@ -203,13 +203,13 @@ if stuck or low_confidence or risky_action:
                 </ul>
               </div>
               <div className="lead-block">
-                <div className="lead-block-title">Solution boundary</div>
-                <ol className="lead-steps">
-                  <li>Agent detects stuck / unsafe state</li>
-                  <li>ShimLayer packages context</li>
-                  <li>Human resolves the minimal missing piece</li>
+                <div className="lead-block-title">Recovery boundary</div>
+                <ul className="lead-list">
+                  <li>Detect stuck / unsafe state</li>
+                  <li>Package context for review</li>
+                  <li>Human resolves the minimal gap</li>
                   <li>Agent continues with structured output</li>
-                </ol>
+                </ul>
               </div>
             </div>
           </section>
