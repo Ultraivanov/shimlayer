@@ -107,13 +107,18 @@ export function LeadPage() {
               <span className="lead-chip">TRACEABLE</span>
             </div>
             <h1>
-              <span className="lead-hero-title">Human recovery layer</span>
-              <span className="lead-hero-title">for AI agents</span>
+              <span className="lead-hero-title lead-hero-title-primary">Human recovery layer</span>
+              <span className="lead-hero-title lead-hero-title-secondary">for AI agents</span>
             </h1>
             <p className="lead-subtitle">
               When an agent gets stuck, uncertain, or reaches a risky action, ShimLayer routes the step to a human,
               returns a bounded intervention, and lets the agent continue.
             </p>
+            <ul className="lead-hero-points">
+              <li>Escalate only the exact missing step</li>
+              <li>Human decision returned as structured trace</li>
+              <li>Works with push or pull deliveries</li>
+            </ul>
             <div className="lead-meta">API‑first · 1–3 min interventions · full trace</div>
             <div className="lead-cta-row">
               <Button size="l" view="action" onClick={() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>

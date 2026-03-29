@@ -201,6 +201,17 @@
   display: block;
 }
 
+.lead-hero-title-primary {
+  background: linear-gradient(90deg, #e2e8f0 0%, #a5b4fc 45%, #22d3ee 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.lead-hero-title-secondary {
+  color: #e2e8f0;
+}
+
 .lead-subtitle {
   color: #cbd5f5;
   font-size: 18px;
@@ -208,6 +219,31 @@
   max-width: 100%;
   font-family: "Inter", "IBM Plex Mono", ui-sans-serif, system-ui;
   overflow-wrap: anywhere;
+}
+
+.lead-hero-points {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  color: #cbd5f5;
+  font-size: 13px;
+  font-family: "Inter", "IBM Plex Mono", ui-sans-serif, system-ui;
+}
+
+.lead-hero-points li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.lead-hero-points li::before {
+  content: "▣";
+  color: #22d3ee;
+  font-size: 10px;
+  line-height: 1.4;
+  margin-top: 3px;
 }
 
 .lead-meta {
