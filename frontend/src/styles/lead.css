@@ -104,6 +104,15 @@
   margin-right: 0;
 }
 
+.lead-nav-links .lead-nav-app {
+  padding: 4px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 999px;
+  color: #e2e8f0;
+  background: rgba(15, 23, 42, 0.35);
+  font-size: 12px;
+}
+
 .lead-nav-cta {
   font-size: 13px;
 }

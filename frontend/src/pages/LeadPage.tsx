@@ -85,6 +85,7 @@ export function LeadPage() {
               <a href="#scope">Scope</a>
               <a href="#pricing">Pricing</a>
               <a href="#alpha">Alpha</a>
+              <a href="/app" className="lead-nav-app">Open Console</a>
             </nav>
             <Button
               size="m"
