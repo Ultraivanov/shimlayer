@@ -111,15 +111,15 @@ export function LeadPage() {
               <span className="lead-hero-title lead-hero-title-secondary">for AI agents</span>
             </h1>
             <p className="lead-subtitle">
-              When an agent gets stuck, uncertain, or reaches a risky action, ShimLayer routes the step to a human,
-              returns a bounded intervention, and lets the agent continue.
+              If an agent stalls, drifts, or hits a risky action, ShimLayer routes that step to a human,
+              returns a bounded decision, and the agent continues.
             </p>
             <ul className="lead-hero-points">
-              <li>Escalate only the exact missing step</li>
-              <li>Human decision returned as structured trace</li>
-              <li>Works with push or pull deliveries</li>
+              <li>Escalate only the missing step</li>
+              <li>Decision returned as structured trace</li>
+              <li>Push or pull delivery modes</li>
             </ul>
-            <div className="lead-meta">API‑first · 1–3 min interventions · full trace</div>
+            <div className="lead-meta">API‑first · 1–3 min responses · replayable trace</div>
             <div className="lead-cta-row">
               <Button size="l" view="action" onClick={() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>
                 Request Alpha Access
@@ -172,21 +172,21 @@ if stuck or low_confidence or risky_action:
             <div className="lead-section-label">01</div>
             <div className="lead-audience-grid">
               <div className="lead-block">
-                <div className="lead-block-title">For</div>
+              <div className="lead-block-title">For</div>
                 <ul className="lead-list">
-                  <li>Teams running agents in production or close to it</li>
-                  <li>Infra‑minded founders shipping autonomous workflows</li>
-                  <li>Developers who need recovery without manual babysitting</li>
+                  <li>Teams running agents in production (or close)</li>
+                  <li>Infra‑minded founders shipping workflows</li>
+                  <li>Developers who need recovery without babysitting</li>
                 </ul>
-              </div>
-              <div className="lead-block">
-                <div className="lead-block-title">Not for</div>
+            </div>
+            <div className="lead-block">
+              <div className="lead-block-title">Not for</div>
                 <ul className="lead-list">
                   <li>Prompt playgrounds or demo‑only experiments</li>
                   <li>General consumer AI curiosity traffic</li>
                   <li>Teams without production pain yet</li>
                 </ul>
-              </div>
+            </div>
             </div>
           </section>
 
@@ -196,16 +196,16 @@ if stuck or low_confidence or risky_action:
               <div className="lead-block">
                 <div className="lead-block-title">Failure modes</div>
                 <ul className="lead-list">
-                  <li>Stuck loops and retries that never converge</li>
-                  <li>UI or flow drift after a product change</li>
+                  <li>Stuck loops or retries that never converge</li>
+                  <li>UI or flow drift after product changes</li>
                   <li>Low‑confidence decisions with no safe default</li>
-                  <li>Risky actions that must be approved</li>
+                  <li>Risky actions that require approval</li>
                 </ul>
               </div>
               <div className="lead-block">
                 <div className="lead-block-title">Recovery boundary</div>
                 <ul className="lead-list">
-                  <li>Detect stuck / unsafe state</li>
+                  <li>Detect stuck or unsafe state</li>
                   <li>Package context for review</li>
                   <li>Human resolves the minimal gap</li>
                   <li>Agent continues with structured output</li>
@@ -254,7 +254,7 @@ if stuck or low_confidence:
                 <li>Stuck states and loops</li>
                 <li>Broken or changed UI</li>
                 <li>Binary decisions</li>
-                <li>Explicit human approval for risky actions</li>
+                <li>Explicit approval for risky actions</li>
               </ul>
             </div>
           </section>
@@ -264,7 +264,7 @@ if stuck or low_confidence:
             <div className="lead-block">
               <div className="lead-block-title">Proof layer</div>
               <p className="lead-muted">
-                Every intervention includes an execution log, timestamps, reason codes, and a replayable trace.
+                Every intervention ships with an execution log, timestamps, reason codes, and a replayable trace.
               </p>
               <div className="lead-proof-row">
                 <span className="lead-chip">EXEC LOG</span>
@@ -296,12 +296,12 @@ if stuck or low_confidence:
               <div className="lead-pricing-grid">
                 <div className="lead-price-main">
                   <div className="lead-price">$1.80 per recovery</div>
-                  <div className="lead-muted">Free tier: 50 per month</div>
+                  <div className="lead-muted">Free tier: 50 recoveries / month</div>
                 </div>
                 <div className="lead-price-cards">
-                  <div className="lead-price-card">$49 · 25 recoveries</div>
-                  <div className="lead-price-card">$199 · 120 recoveries</div>
-                  <div className="lead-price-card">$999 · 600 recoveries</div>
+                  <div className="lead-price-card">$49 · 25 recoveries / month</div>
+                  <div className="lead-price-card">$199 · 120 recoveries / month</div>
+                  <div className="lead-price-card">$999 · 600 recoveries / month</div>
                 </div>
               </div>
             </div>
@@ -312,13 +312,13 @@ if stuck or low_confidence:
             <div className="lead-block">
               <div className="lead-block-title">Alpha program</div>
               <p className="lead-muted">
-                Early alpha, limited capacity, manual onboarding, and a direct feedback loop with the founders.
+                Early alpha, limited capacity, manual onboarding, and a founder feedback loop.
               </p>
               <div className="lead-cta-inline">
                 <Button size="m" view="action" onClick={() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>
                   Request Alpha Access
                 </Button>
-                <span className="lead-muted">We typically onboard within 2–5 days.</span>
+                <span className="lead-muted">Typical onboarding: 2–5 days.</span>
               </div>
             </div>
           </section>
@@ -330,15 +330,15 @@ if stuck or low_confidence:
               <div className="lead-faq-grid">
                 <div>
                   <div className="lead-faq-q">Do we need to change our agent stack?</div>
-                  <div className="lead-faq-a">No. ShimLayer sits at the recovery boundary and accepts context via API.</div>
+                  <div className="lead-faq-a">No. ShimLayer sits at the recovery boundary; send context via API.</div>
                 </div>
                 <div>
                   <div className="lead-faq-q">What does a human see?</div>
-                  <div className="lead-faq-a">Only the minimal state you send: logs, snapshots, and the specific decision.</div>
+                  <div className="lead-faq-a">Only what you send: logs, snapshots, and the specific decision.</div>
                 </div>
                 <div>
                   <div className="lead-faq-q">How fast is response?</div>
-                  <div className="lead-faq-a">Typical turnaround is 1–3 minutes, with SLA options for priority queues.</div>
+                  <div className="lead-faq-a">Typical turnaround is 1–3 minutes; SLA options for priority queues.</div>
                 </div>
               </div>
             </div>
@@ -348,7 +348,7 @@ if stuck or low_confidence:
             <div className="lead-section-label">09</div>
             <div className="lead-block">
               <div className="lead-block-title">Request Alpha Access</div>
-              <p className="lead-muted">We use this to qualify teams and prioritize onboarding.</p>
+              <p className="lead-muted">Used to qualify teams and prioritize onboarding.</p>
               <div className="lead-form-grid">
                 <TextInput size="l" placeholder="Contact name" value={leadName} onUpdate={setLeadName} disabled={submitBusy} />
                 <TextInput size="l" placeholder="Work email" value={leadEmail} onUpdate={setLeadEmail} disabled={submitBusy} />
