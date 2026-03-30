@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import os
 from threading import RLock
 from uuid import UUID, uuid4
 
@@ -76,15 +77,35 @@ class InMemoryRepository:
             return str(getattr(value, "value"))
         return str(value)
 
+    @staticmethod
+    def _read_dev_seed() -> tuple[int, str | None]:
+        seed_credits_raw = os.getenv("SHIMLAYER_DEV_SEED_CREDITS", "").strip()
+        seed_plan_raw = os.getenv("SHIMLAYER_DEV_PLAN", "").strip().lower()
+        seed_credits = 0
+        if seed_credits_raw:
+            try:
+                seed_credits = max(0, int(seed_credits_raw))
+            except ValueError:
+                seed_credits = 0
+        desired_plan = seed_plan_raw or ("pro" if seed_credits > 0 else "")
+        return seed_credits, desired_plan or None
+
     def get_or_create_account(self, api_key: str) -> tuple[UUID, float, int]:
         with self._lock:
+            seed_credits, desired_plan = self._read_dev_seed()
             if api_key not in self._accounts:
                 self._accounts[api_key] = {
                     "id": uuid4(),
                     "balance_usd": 0.0,
-                    "flow_credits": 0,
-                    "plan": "free",
+                    "flow_credits": seed_credits,
+                    "plan": desired_plan or "free",
                 }
+            elif seed_credits or desired_plan:
+                account = self._accounts[api_key]
+                if seed_credits and account.get("flow_credits", 0) < seed_credits:
+                    account["flow_credits"] = seed_credits
+                if desired_plan and account.get("plan", "free") != desired_plan:
+                    account["plan"] = desired_plan
             account = self._accounts[api_key]
             return account["id"], account["balance_usd"], account["flow_credits"]
 

@@ -17,6 +17,8 @@ services:
       - SHIMLAYER_DB_DSN=postgresql://shim:shim@postgres:5432/shimlayer
       - SHIMLAYER_ADMIN_API_KEY=dev-admin-key
       - SHIMLAYER_WEBHOOK_SECRET=dev-webhook-secret
+      - SHIMLAYER_DEV_SEED_CREDITS=200
+      - SHIMLAYER_DEV_PLAN=pro
     depends_on:
       - postgres
       - migrate

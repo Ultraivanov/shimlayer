@@ -1,5 +1,6 @@
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
+import os
 
 import psycopg
 from psycopg.rows import dict_row
@@ -63,24 +64,53 @@ class PostgresRepository:
     def _conn(self) -> psycopg.Connection:
         return psycopg.connect(self.dsn, row_factory=dict_row)
 
+    @staticmethod
+    def _read_dev_seed() -> tuple[int, str | None]:
+        seed_credits_raw = os.getenv("SHIMLAYER_DEV_SEED_CREDITS", "").strip()
+        seed_plan_raw = os.getenv("SHIMLAYER_DEV_PLAN", "").strip().lower()
+        seed_credits = 0
+        if seed_credits_raw:
+            try:
+                seed_credits = max(0, int(seed_credits_raw))
+            except ValueError:
+                seed_credits = 0
+        desired_plan = seed_plan_raw or ("pro" if seed_credits > 0 else "")
+        return seed_credits, desired_plan or None
+
     def _get_or_create_account(self, conn: psycopg.Connection, api_key: str) -> tuple[UUID, float, int]:
+        seed_credits, desired_plan = self._read_dev_seed()
         with conn.cursor() as cur:
             cur.execute(
-                "select id, balance_usd, flow_credits from public.accounts where external_ref = %s",
+                "select id, balance_usd, flow_credits, plan from public.accounts where external_ref = %s",
                 (api_key,),
             )
             row = cur.fetchone()
             if row:
-                return row["id"], float(row["balance_usd"]), int(row["flow_credits"])
+                current_credits = int(row["flow_credits"])
+                current_plan = row.get("plan") or "free"
+                target_credits = max(current_credits, seed_credits) if seed_credits else current_credits
+                target_plan = desired_plan or current_plan
+                if target_credits != current_credits or target_plan != current_plan:
+                    cur.execute(
+                        """
+                        update public.accounts
+                        set flow_credits = %s, plan = %s
+                        where id = %s
+                        """,
+                        (target_credits, target_plan, row["id"]),
+                    )
+                    return row["id"], float(row["balance_usd"]), target_credits
+                return row["id"], float(row["balance_usd"]), current_credits
             account_id = uuid4()
+            plan = desired_plan or ("pro" if seed_credits > 0 else "free")
             cur.execute(
                 """
                 insert into public.accounts (id, external_ref, plan, balance_usd, flow_credits)
-                values (%s, %s, 'free', 0, 0)
+                values (%s, %s, %s, 0, %s)
                 """,
-                (account_id, api_key),
+                (account_id, api_key, plan, seed_credits),
             )
-            return account_id, 0.0, 0
+            return account_id, 0.0, seed_credits
 
     def consume_rate_limit(self, api_key: str) -> None:
         with self._conn() as conn:

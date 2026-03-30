@@ -2998,122 +2998,139 @@ export function OpsPage() {
                     <span className="muted">none</span>
                   )}
                 </p>
-                {selectedFlow.callback_url ? (
-                  <div className="detail-block" data-testid="ops-webhook-last">
-                    <p className="muted" style={{ marginTop: 0 }}>
-                      Webhook delivery status
-                    </p>
-                    {!canViewWebhookDeliveries ? (
+                <div className="detail-block" data-testid="ops-webhook-last">
+                  <p className="muted" style={{ marginTop: 0 }}>
+                    Webhook delivery status
+                  </p>
+                  {!selectedFlow.callback_url ? (
+                    <>
                       <p className="muted" style={{ marginBottom: 0 }}>
-                        Hidden for role <span className="mono">{role}</span>
+                        No callback URL on this task. Add one to enable attempts and Resend.
                       </p>
-                    ) : (
-                      <>
-                        {webhookDeliveriesError ? (
-                          <p className="muted" style={{ marginBottom: 0 }}>
-                            error: {shortError(webhookDeliveriesError, 240)}
-                          </p>
-                        ) : webhookLast === null ? (
-                          <p className="muted" style={{ marginBottom: 0 }}>
-                            No attempts yet
-                          </p>
-                        ) : (
-                          <div className="row-tight" style={{ alignItems: "center", flexWrap: "wrap" }}>
-                            <span className={`chip ${webhookLast.success ? "chip-ok" : "chip-warn"}`}>
-                              {webhookLast.success ? "ok" : "failed"} {webhookLast.status_code ?? "-"}
-                            </span>
-                            <span className="muted mono">{new Date(webhookLast.created_at).toLocaleString()}</span>
-                            {webhookLast.error ? (
-                              <span className="muted mono" title={webhookLast.error}>
-                                {shortError(webhookLast.error, 180)}
-                              </span>
-                            ) : null}
-                          </div>
-                        )}
-                        {webhookLast && typeof webhookLast.attempt_no === "number" ? (
-                          <p className="muted mono" style={{ marginTop: 6, marginBottom: 0 }}>
-                            last attempt #{webhookLast.attempt_no}
-                          </p>
-                        ) : null}
-                        <div className="row-tight" style={{ marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
-                          <Button
-                            size="s"
-                            view="flat"
-                            disabled={webhookDeliveriesLoading}
-                            onClick={() => void loadWebhookLast(selectedFlow.id)}
-                            data-testid="ops-webhook-refresh"
-                          >
-                            Refresh
+                      <div className="row-tight" style={{ marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
+                        <Button size="s" view="flat" disabled data-testid="ops-webhook-refresh">
+                          Refresh
+                        </Button>
+                        {canResendWebhook ? (
+                          <Button size="s" view="outlined" disabled data-testid="ops-webhook-resend">
+                            Resend now
                           </Button>
-                          {canResendWebhook ? (
-                            <Button
-                              size="s"
-                              view="outlined"
-                              disabled={webhookResendRunning || webhookDeliveriesLoading}
-                              loading={webhookResendRunning}
-                              onClick={() => void resendWebhook(selectedFlow.id)}
-                              data-testid="ops-webhook-resend"
-                            >
-                              Resend now
-                            </Button>
-                          ) : null}
-                          <Button
-                            size="s"
-                            view="flat"
-                            onClick={() => {
-                              setWebhookAttemptsOpen((v) => !v);
-                              if (!webhookAttemptsOpen) void loadWebhookAttempts(selectedFlow.id);
-                            }}
-                            disabled={webhookDeliveriesLoading}
-                            data-testid="ops-webhook-toggle-attempts"
-                          >
-                            {webhookAttemptsOpen
-                              ? `Hide attempts${webhookDeliveries.length ? ` (${webhookDeliveries.length})` : ""}`
-                              : `Show attempts${webhookDeliveries.length ? ` (${webhookDeliveries.length})` : ""}`}
-                          </Button>
-                        </div>
-                        <p className="muted" style={{ marginTop: 6, marginBottom: 0 }}>
-                          Resend enqueues a new delivery attempt; refresh or open attempts to see the result.
-                        </p>
-                        <p className="muted" style={{ marginTop: 4, marginBottom: 0 }}>
-                          Resend uses the current callback URL.
-                        </p>
-                      </>
-                    )}
-                    {webhookAttemptsOpen && canViewWebhookDeliveries ? (
-                      <div className="list" style={{ marginTop: 8 }}>
-                        {webhookDeliveriesLoading ? <p className="muted">Loading attempts…</p> : null}
-                        {!webhookDeliveriesLoading && webhookDeliveries.length === 0 ? (
-                          <p className="muted">No attempts loaded yet (try refresh).</p>
                         ) : null}
-                        {!webhookDeliveriesLoading && webhookDeliveries.length > 0 ? (
-                          <p className="muted mono" style={{ marginTop: 0 }}>
-                            attempts loaded: {webhookDeliveries.length}
-                          </p>
-                        ) : null}
-                        {webhookDeliveries.map((d) => (
-                          <div
-                            key={d.id}
-                            className="row-tight"
-                            style={{ justifyContent: "space-between", alignItems: "baseline" }}
-                            data-testid="ops-webhook-attempt-row"
-                            data-attempt-no={String(d.attempt_no)}
-                          >
-                            <span className="mono">
-                              {new Date(d.created_at).toLocaleString()} · attempt {d.attempt_no} ·{" "}
-                              {d.success ? "ok" : "failed"} {d.status_code ?? "-"}
-                            </span>
-                            {d.error ? (
-                              <span className="muted mono" style={{ marginLeft: 12 }} title={d.error}>
-                                {shortError(d.error, 160)}
-                              </span>
-                            ) : null}
-                          </div>
-                        ))}
+                        <Button size="s" view="flat" disabled data-testid="ops-webhook-toggle-attempts">
+                          Show attempts
+                        </Button>
                       </div>
-                    ) : null}
-                  </div>
-                ) : null}
+                    </>
+                  ) : !canViewWebhookDeliveries ? (
+                    <p className="muted" style={{ marginBottom: 0 }}>
+                      Hidden for role <span className="mono">{role}</span>
+                    </p>
+                  ) : (
+                    <>
+                      {webhookDeliveriesError ? (
+                        <p className="muted" style={{ marginBottom: 0 }}>
+                          error: {shortError(webhookDeliveriesError, 240)}
+                        </p>
+                      ) : webhookLast === null ? (
+                        <p className="muted" style={{ marginBottom: 0 }}>
+                          No attempts yet
+                        </p>
+                      ) : (
+                        <div className="row-tight" style={{ alignItems: "center", flexWrap: "wrap" }}>
+                          <span className={`chip ${webhookLast.success ? "chip-ok" : "chip-warn"}`}>
+                            {webhookLast.success ? "ok" : "failed"} {webhookLast.status_code ?? "-"}
+                          </span>
+                          <span className="muted mono">{new Date(webhookLast.created_at).toLocaleString()}</span>
+                          {webhookLast.error ? (
+                            <span className="muted mono" title={webhookLast.error}>
+                              {shortError(webhookLast.error, 180)}
+                            </span>
+                          ) : null}
+                        </div>
+                      )}
+                      {webhookLast && typeof webhookLast.attempt_no === "number" ? (
+                        <p className="muted mono" style={{ marginTop: 6, marginBottom: 0 }}>
+                          last attempt #{webhookLast.attempt_no}
+                        </p>
+                      ) : null}
+                      <div className="row-tight" style={{ marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
+                        <Button
+                          size="s"
+                          view="flat"
+                          disabled={webhookDeliveriesLoading}
+                          onClick={() => void loadWebhookLast(selectedFlow.id)}
+                          data-testid="ops-webhook-refresh"
+                        >
+                          Refresh
+                        </Button>
+                        {canResendWebhook ? (
+                          <Button
+                            size="s"
+                            view="outlined"
+                            disabled={webhookResendRunning || webhookDeliveriesLoading}
+                            loading={webhookResendRunning}
+                            onClick={() => void resendWebhook(selectedFlow.id)}
+                            data-testid="ops-webhook-resend"
+                          >
+                            Resend now
+                          </Button>
+                        ) : null}
+                        <Button
+                          size="s"
+                          view="flat"
+                          onClick={() => {
+                            setWebhookAttemptsOpen((v) => !v);
+                            if (!webhookAttemptsOpen) void loadWebhookAttempts(selectedFlow.id);
+                          }}
+                          disabled={webhookDeliveriesLoading}
+                          data-testid="ops-webhook-toggle-attempts"
+                        >
+                          {webhookAttemptsOpen
+                            ? `Hide attempts${webhookDeliveries.length ? ` (${webhookDeliveries.length})` : ""}`
+                            : `Show attempts${webhookDeliveries.length ? ` (${webhookDeliveries.length})` : ""}`}
+                        </Button>
+                      </div>
+                      <p className="muted" style={{ marginTop: 6, marginBottom: 0 }}>
+                        Resend enqueues a new delivery attempt; refresh or open attempts to see the result.
+                      </p>
+                      <p className="muted" style={{ marginTop: 4, marginBottom: 0 }}>
+                        Resend uses the current callback URL.
+                      </p>
+                    </>
+                  )}
+                  {webhookAttemptsOpen && canViewWebhookDeliveries ? (
+                    <div className="list" style={{ marginTop: 8 }}>
+                      {webhookDeliveriesLoading ? <p className="muted">Loading attempts…</p> : null}
+                      {!webhookDeliveriesLoading && webhookDeliveries.length === 0 ? (
+                        <p className="muted">No attempts loaded yet (try refresh).</p>
+                      ) : null}
+                      {!webhookDeliveriesLoading && webhookDeliveries.length > 0 ? (
+                        <p className="muted mono" style={{ marginTop: 0 }}>
+                          attempts loaded: {webhookDeliveries.length}
+                        </p>
+                      ) : null}
+                      {webhookDeliveries.map((d) => (
+                        <div
+                          key={d.id}
+                          className="row-tight"
+                          style={{ justifyContent: "space-between", alignItems: "baseline" }}
+                          data-testid="ops-webhook-attempt-row"
+                          data-attempt-no={String(d.attempt_no)}
+                        >
+                          <span className="mono">
+                            {new Date(d.created_at).toLocaleString()} · attempt {d.attempt_no} ·{" "}
+                            {d.success ? "ok" : "failed"} {d.status_code ?? "-"}
+                          </span>
+                          {d.error ? (
+                            <span className="muted mono" style={{ marginLeft: 12 }} title={d.error}>
+                              {shortError(d.error, 160)}
+                            </span>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
                 {showManualReviewQueue ? (
                   <p>
                     <strong>Claim:</strong>{" "}
