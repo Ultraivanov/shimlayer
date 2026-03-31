@@ -3434,6 +3434,15 @@ export function OpsPage() {
         <p className="muted">
           Telegram setup: create a bot via BotFather and share onboarding instructions after approval. Collect chat IDs from operators so we can send tasks.
         </p>
+        <div className="detail-block">
+          <p className="muted" style={{ marginTop: 0 }}>BotFather quick guide</p>
+          <ol className="lead-list">
+            <li>Open @BotFather → /newbot → choose name + username → copy token.</li>
+            <li>Operator messages the bot once (any text) so Telegram creates a chat.</li>
+            <li>Open <span className="mono">https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</span> and find the chat_id.</li>
+            <li>Paste chat_id into the application and click Approve.</li>
+          </ol>
+        </div>
         <div className="list">
           {operatorApplicationsLoading ? <p className="muted">Loading applications…</p> : null}
           {!operatorApplicationsLoading && operatorApplicationsError ? (
