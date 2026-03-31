@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     shimlayer_auto_check_openai_include_local_snippets: bool = False
     shimlayer_auto_check_openai_max_snippet_bytes: int = 2048
     shimlayer_auto_check_openai_max_snippet_lines: int = 60
+    shimlayer_telegram_bot_token: str | None = None
+    shimlayer_telegram_api_base: str = "https://api.telegram.org"
 
     @property
     def security_warnings(self) -> list[str]:

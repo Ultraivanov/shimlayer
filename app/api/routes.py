@@ -77,6 +77,7 @@ from app.repositories.errors import (
 from app.webhooks.stripe_verification import verify_stripe_signature
 from app.services.openai_hitl import compose_context_capsule
 from app.services.artifact_storage import load_local_artifact, save_local_artifact
+from app.services.telegram import send_telegram_message
 
 router = APIRouter(prefix="/v1")
 settings = get_settings()
@@ -1336,6 +1337,18 @@ def update_operator_application(
     record = repo.update_operator_application(application_id, payload, reviewer_id=admin_ctx.user_id)
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Operator application not found")
+    if record.telegram_chat_id and record.status in {"approved", "rejected"}:
+        if record.status == "approved":
+            message = (
+                "✅ You are approved for ShimLayer operator onboarding. "
+                "We’ll share task access and onboarding steps here."
+            )
+        else:
+            message = (
+                "Thank you for applying to ShimLayer. "
+                "We can’t approve your application right now, but we’ll keep your details on file."
+            )
+        _ = send_telegram_message(record.telegram_chat_id, message)
     return record
 
 
