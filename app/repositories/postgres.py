@@ -15,6 +15,7 @@ from app.models import (
     CreateArtifactRequest,
     CreateTaskRequest,
     CreateLeadRequest,
+    CreateOperatorApplicationRequest,
     LeadRecord,
     OpsMetricsResponse,
     OpsMetricsHistoryPoint,
@@ -39,6 +40,8 @@ from app.models import (
     WebhookJob,
     WebhookDeadLetter,
     WebhookDelivery,
+    OperatorApplicationRecord,
+    UpdateOperatorApplicationRequest,
     new_task,
     utcnow,
 )
@@ -386,6 +389,164 @@ class PostgresRepository:
             page=row.get("page"),
             metadata=row.get("metadata") or {},
             created_at=row["created_at"],
+        )
+
+    def create_operator_application(self, payload: CreateOperatorApplicationRequest) -> OperatorApplicationRecord:
+        application_id = uuid4()
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    insert into public.operator_applications
+                    (id, region, email, phone, telegram_handle, telegram_chat_id, experience, languages, status, source, page, metadata)
+                    values (%s, %s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s)
+                    returning id, region, email, phone, telegram_handle, telegram_chat_id, experience, languages,
+                      status, decision_note, reviewed_by, reviewed_at, source, page, metadata, created_at, updated_at
+                    """,
+                    (
+                        application_id,
+                        payload.region,
+                        payload.email,
+                        payload.phone,
+                        payload.telegram_handle,
+                        payload.telegram_chat_id,
+                        payload.experience,
+                        payload.languages,
+                        payload.source,
+                        payload.page,
+                        Json(payload.metadata or {}),
+                    ),
+                )
+                row = cur.fetchone()
+            conn.commit()
+        if not row:
+            raise ValueError("Failed to insert operator application")
+        return OperatorApplicationRecord(
+            id=row["id"],
+            region=row["region"],
+            email=row["email"],
+            phone=row["phone"],
+            telegram_handle=row["telegram_handle"],
+            telegram_chat_id=row.get("telegram_chat_id"),
+            experience=row.get("experience"),
+            languages=row.get("languages"),
+            status=row["status"],
+            decision_note=row.get("decision_note"),
+            reviewed_by=row.get("reviewed_by"),
+            reviewed_at=row.get("reviewed_at"),
+            source=row.get("source"),
+            page=row.get("page"),
+            metadata=row.get("metadata") or {},
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    def list_operator_applications(
+        self,
+        status: str | None = None,
+        limit: int = 50,
+    ) -> list[OperatorApplicationRecord]:
+        capped_limit = max(1, min(limit, 500))
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                if status:
+                    cur.execute(
+                        """
+                        select id, region, email, phone, telegram_handle, telegram_chat_id, experience, languages,
+                          status, decision_note, reviewed_by, reviewed_at, source, page, metadata, created_at, updated_at
+                        from public.operator_applications
+                        where status = %s
+                        order by created_at desc
+                        limit %s
+                        """,
+                        (status, capped_limit),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        select id, region, email, phone, telegram_handle, telegram_chat_id, experience, languages,
+                          status, decision_note, reviewed_by, reviewed_at, source, page, metadata, created_at, updated_at
+                        from public.operator_applications
+                        order by created_at desc
+                        limit %s
+                        """,
+                        (capped_limit,),
+                    )
+                rows = cur.fetchall() or []
+            conn.commit()
+        return [
+            OperatorApplicationRecord(
+                id=row["id"],
+                region=row["region"],
+                email=row["email"],
+                phone=row["phone"],
+                telegram_handle=row["telegram_handle"],
+                telegram_chat_id=row.get("telegram_chat_id"),
+                experience=row.get("experience"),
+                languages=row.get("languages"),
+                status=row["status"],
+                decision_note=row.get("decision_note"),
+                reviewed_by=row.get("reviewed_by"),
+                reviewed_at=row.get("reviewed_at"),
+                source=row.get("source"),
+                page=row.get("page"),
+                metadata=row.get("metadata") or {},
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+            )
+            for row in rows
+        ]
+
+    def update_operator_application(
+        self,
+        application_id: UUID,
+        payload: UpdateOperatorApplicationRequest,
+        reviewer_id: str,
+    ) -> OperatorApplicationRecord | None:
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    update public.operator_applications
+                    set status = %s,
+                        decision_note = %s,
+                        reviewed_by = %s,
+                        reviewed_at = now(),
+                        telegram_chat_id = coalesce(%s, telegram_chat_id)
+                    where id = %s
+                    returning id, region, email, phone, telegram_handle, telegram_chat_id, experience, languages,
+                      status, decision_note, reviewed_by, reviewed_at, source, page, metadata, created_at, updated_at
+                    """,
+                    (
+                        payload.status,
+                        payload.decision_note,
+                        reviewer_id,
+                        payload.telegram_chat_id,
+                        application_id,
+                    ),
+                )
+                row = cur.fetchone()
+            conn.commit()
+        if not row:
+            return None
+        return OperatorApplicationRecord(
+            id=row["id"],
+            region=row["region"],
+            email=row["email"],
+            phone=row["phone"],
+            telegram_handle=row["telegram_handle"],
+            telegram_chat_id=row.get("telegram_chat_id"),
+            experience=row.get("experience"),
+            languages=row.get("languages"),
+            status=row["status"],
+            decision_note=row.get("decision_note"),
+            reviewed_by=row.get("reviewed_by"),
+            reviewed_at=row.get("reviewed_at"),
+            source=row.get("source"),
+            page=row.get("page"),
+            metadata=row.get("metadata") or {},
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
         )
 
     def create_task(self, api_key: str, payload: CreateTaskRequest) -> Task:

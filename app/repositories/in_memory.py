@@ -12,6 +12,7 @@ from app.models import (
     CreateArtifactRequest,
     CreateTaskRequest,
     CreateLeadRequest,
+    CreateOperatorApplicationRequest,
     LeadRecord,
     OpsMetricsHistoryPoint,
     OpsMetricsResponse,
@@ -33,6 +34,8 @@ from app.models import (
     TaskUpdatedEvent,
     TaskWithReview,
     TopUpRequest,
+    OperatorApplicationRecord,
+    UpdateOperatorApplicationRequest,
     WebhookJob,
     WebhookDeadLetter,
     WebhookDelivery,
@@ -69,6 +72,7 @@ class InMemoryRepository:
         self._stripe_subscriptions: dict[str, dict] = {}
         self._openai_interruptions: dict[str, OpenAIInterruptionRecord] = {}
         self._leads: list[LeadRecord] = []
+        self._operator_applications: dict[UUID, OperatorApplicationRecord] = {}
         self._ops_metrics_history: list[OpsMetricsHistoryPoint] = []
 
     @staticmethod
@@ -280,6 +284,68 @@ class InMemoryRepository:
             )
             self._leads.append(lead)
             return lead
+
+    def create_operator_application(self, payload: CreateOperatorApplicationRequest) -> OperatorApplicationRecord:
+        with self._lock:
+            now = utcnow()
+            record = OperatorApplicationRecord(
+                id=uuid4(),
+                region=payload.region,
+                email=payload.email,
+                phone=payload.phone,
+                telegram_handle=payload.telegram_handle,
+                telegram_chat_id=payload.telegram_chat_id,
+                experience=payload.experience,
+                languages=payload.languages,
+                status="pending",
+                decision_note=None,
+                reviewed_by=None,
+                reviewed_at=None,
+                source=payload.source,
+                page=payload.page,
+                metadata=payload.metadata or {},
+                created_at=now,
+                updated_at=now,
+            )
+            self._operator_applications[record.id] = record
+            return record
+
+    def list_operator_applications(
+        self,
+        status: str | None = None,
+        limit: int = 50,
+    ) -> list[OperatorApplicationRecord]:
+        with self._lock:
+            rows = list(self._operator_applications.values())
+            if status:
+                rows = [r for r in rows if r.status == status]
+            rows.sort(key=lambda r: r.created_at, reverse=True)
+            capped = rows[: max(1, min(limit, 500))]
+            return list(capped)
+
+    def update_operator_application(
+        self,
+        application_id: UUID,
+        payload: UpdateOperatorApplicationRequest,
+        reviewer_id: str,
+    ) -> OperatorApplicationRecord | None:
+        with self._lock:
+            record = self._operator_applications.get(application_id)
+            if not record:
+                return None
+            now = utcnow()
+            updates: dict[str, object] = {
+                "status": payload.status,
+                "decision_note": payload.decision_note,
+                "reviewed_by": reviewer_id,
+                "reviewed_at": now,
+                "updated_at": now,
+            }
+            if payload.telegram_chat_id is not None:
+                updates["telegram_chat_id"] = payload.telegram_chat_id
+            updated = record.model_copy(update=updates)
+            self._operator_applications[application_id] = updated
+            return updated
 
     def create_task(self, api_key: str, payload: CreateTaskRequest) -> Task:
         with self._lock:

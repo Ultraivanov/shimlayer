@@ -16,6 +16,17 @@ export function LeadPage() {
   const [submitBusy, setSubmitBusy] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitOk, setSubmitOk] = useState(false);
+  const [operatorRegion, setOperatorRegion] = useState("");
+  const [operatorEmail, setOperatorEmail] = useState("");
+  const [operatorPhone, setOperatorPhone] = useState("");
+  const [operatorTelegram, setOperatorTelegram] = useState("");
+  const [operatorTelegramChatId, setOperatorTelegramChatId] = useState("");
+  const [operatorExperience, setOperatorExperience] = useState("");
+  const [operatorLanguages, setOperatorLanguages] = useState("");
+  const [operatorWebsite, setOperatorWebsite] = useState("");
+  const [operatorBusy, setOperatorBusy] = useState(false);
+  const [operatorError, setOperatorError] = useState("");
+  const [operatorOk, setOperatorOk] = useState(false);
 
   const formRef = useRef<HTMLDivElement | null>(null);
   const flowRef = useRef<HTMLDivElement | null>(null);
@@ -71,6 +82,41 @@ export function LeadPage() {
     }
   }
 
+  async function submitOperatorApplication() {
+    setOperatorError("");
+    setOperatorOk(false);
+    const region = operatorRegion.trim();
+    const email = operatorEmail.trim();
+    const phone = operatorPhone.trim();
+    const telegram = operatorTelegram.trim();
+    if (!region || !email || !phone || !telegram) {
+      setOperatorError("Please add region, email, phone, and Telegram handle.");
+      return;
+    }
+    setOperatorBusy(true);
+    try {
+      await Api.createOperatorApplication({
+        region,
+        email,
+        phone,
+        telegram_handle: telegram,
+        telegram_chat_id: operatorTelegramChatId.trim() || null,
+        experience: operatorExperience.trim() || null,
+        languages: operatorLanguages.trim() || null,
+        source: "lead_page",
+        page: pagePath,
+        metadata: utmMeta,
+        website: operatorWebsite.trim() || null
+      });
+      setOperatorOk(true);
+      setOperatorWebsite("");
+    } catch (e) {
+      setOperatorError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setOperatorBusy(false);
+    }
+  }
+
   return (
     <main className="lead-root">
       <header className="lead-nav">
@@ -85,6 +131,7 @@ export function LeadPage() {
               <a href="#scope">Scope</a>
               <a href="#pricing">Pricing</a>
               <a href="#alpha">Alpha</a>
+              <a href="#operators">Operators</a>
               <a href="/app" className="lead-nav-app">Open Console</a>
             </nav>
             <Button
@@ -308,8 +355,95 @@ if stuck or low_confidence:
             </div>
           </section>
 
-          <section className="lead-section lead-alpha" id="alpha">
+          <section className="lead-section lead-operators" id="operators">
             <div className="lead-section-label">07</div>
+            <div className="lead-block">
+              <div className="lead-block-title">Operator onboarding</div>
+              <p className="lead-muted">
+                We approve operators after a lightweight KYC check. Approved operators receive tasks via Telegram
+                (bot setup will be shared on approval).
+              </p>
+              <div className="lead-form-grid">
+                <TextInput
+                  size="l"
+                  value={operatorRegion}
+                  onUpdate={setOperatorRegion}
+                  placeholder="Region / timezone"
+                  title="Region"
+                  disabled={operatorBusy}
+                />
+                <TextInput
+                  size="l"
+                  value={operatorEmail}
+                  onUpdate={setOperatorEmail}
+                  placeholder="Work email"
+                  title="Email"
+                  type="email"
+                  disabled={operatorBusy}
+                />
+                <TextInput
+                  size="l"
+                  value={operatorPhone}
+                  onUpdate={setOperatorPhone}
+                  placeholder="Phone (WhatsApp/Signal ok)"
+                  title="Phone"
+                  disabled={operatorBusy}
+                />
+                <TextInput
+                  size="l"
+                  value={operatorTelegram}
+                  onUpdate={setOperatorTelegram}
+                  placeholder="@telegram_handle"
+                  title="Telegram"
+                  disabled={operatorBusy}
+                />
+                <TextInput
+                  size="l"
+                  value={operatorTelegramChatId}
+                  onUpdate={setOperatorTelegramChatId}
+                  placeholder="Optional chat id (if you already have it)"
+                  title="Telegram chat id (optional)"
+                  disabled={operatorBusy}
+                />
+                <TextInput
+                  size="l"
+                  value={operatorLanguages}
+                  onUpdate={setOperatorLanguages}
+                  placeholder="Languages (e.g. EN, RU)"
+                  title="Languages"
+                  disabled={operatorBusy}
+                />
+                <TextArea
+                  size="l"
+                  value={operatorExperience}
+                  onUpdate={setOperatorExperience}
+                  placeholder="Relevant experience (ops, support, QA, trust & safety)"
+                  minRows={3}
+                  disabled={operatorBusy}
+                />
+                <TextInput
+                  className="lead-honeypot"
+                  size="l"
+                  value={operatorWebsite}
+                  onUpdate={setOperatorWebsite}
+                  placeholder="Website"
+                  title="Website"
+                  tabIndex={-1}
+                  autoComplete="off"
+                />
+              </div>
+              {operatorError ? <div className="lead-error">{operatorError}</div> : null}
+              {operatorOk ? <div className="lead-success">Thanks! We’ll review and reach out with next steps.</div> : null}
+              <div className="lead-form-actions">
+                <Button size="l" view="action" loading={operatorBusy} onClick={() => void submitOperatorApplication()}>
+                  Apply as Operator
+                </Button>
+              </div>
+            </div>
+          </section>
+
+          <section className="lead-section lead-alpha" id="alpha">
+            <div className="lead-section-label">08</div>
             <div className="lead-block">
               <div className="lead-block-title">Alpha program</div>
               <p className="lead-muted">
@@ -325,7 +459,7 @@ if stuck or low_confidence:
           </section>
 
           <section className="lead-section lead-faq">
-            <div className="lead-section-label">08</div>
+            <div className="lead-section-label">09</div>
             <div className="lead-block">
               <div className="lead-block-title">FAQ</div>
               <div className="lead-faq-grid">
@@ -346,7 +480,7 @@ if stuck or low_confidence:
           </section>
 
           <section className="lead-section lead-form" ref={formRef}>
-            <div className="lead-section-label">09</div>
+            <div className="lead-section-label">10</div>
             <div className="lead-block">
               <div className="lead-block-title">Request Alpha Access</div>
               <p className="lead-muted">Used to qualify teams and prioritize onboarding.</p>

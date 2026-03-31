@@ -24,6 +24,7 @@ from app.models import (
     CreateArtifactRequest,
     UploadArtifactRequest,
     CreateLeadRequest,
+    CreateOperatorApplicationRequest,
     CreateOpsIncidentRequest,
     StripeCheckoutSessionRequest,
     StripeCheckoutSessionResponse,
@@ -50,6 +51,7 @@ from app.models import (
     OpenAIResumeResponse,
     PackageInfo,
     LeadRecord,
+    OperatorApplicationRecord,
     PackagePurchaseRequest,
     PackagePurchaseResponse,
     StuckRecoveryResult,
@@ -59,6 +61,7 @@ from app.models import (
     TaskSyncResponse,
     TopUpRequest,
     UpdateOpsIncidentRequest,
+    UpdateOperatorApplicationRequest,
     WebhookDeadLetter,
     WebhookDelivery,
     LedgerEntry,
@@ -1028,6 +1031,27 @@ def create_lead(
     return repo.create_lead(payload)
 
 
+@router.post("/operator-applications", response_model=OperatorApplicationRecord, status_code=status.HTTP_201_CREATED)
+def create_operator_application(
+    payload: CreateOperatorApplicationRequest,
+    request: Request,
+    repo: Repository = Depends(get_repo),
+) -> OperatorApplicationRecord | Response:
+    if payload.website and payload.website.strip():
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    metadata = dict(payload.metadata or {})
+    if request.client and request.client.host and "remote_ip" not in metadata:
+        metadata["remote_ip"] = request.client.host
+    user_agent = request.headers.get("user-agent")
+    if user_agent and "user_agent" not in metadata:
+        metadata["user_agent"] = user_agent
+    referer = request.headers.get("referer")
+    if referer and "referer" not in metadata:
+        metadata["referer"] = referer
+    payload = payload.model_copy(update={"metadata": metadata})
+    return repo.create_operator_application(payload)
+
+
 @router.get("/healthz")
 def healthz() -> dict[str, str]:
     return {"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()}
@@ -1280,6 +1304,39 @@ def ops_incidents(
 ) -> list[OpsIncident]:
     _ = (api_key, admin_key, admin_ctx)
     return repo.list_incidents(status=status_filter, limit=limit)
+
+
+@router.get("/ops/operator-applications", response_model=list[OperatorApplicationRecord])
+def list_operator_applications(
+    status_filter: str | None = None,
+    limit: int = 50,
+    api_key: str = Depends(require_api_key),
+    admin_key: str = Depends(require_admin_key),
+    admin_ctx: AdminContext = Depends(require_admin_context),
+    repo: Repository = Depends(get_repo),
+) -> list[OperatorApplicationRecord]:
+    _ = (api_key, admin_key, admin_ctx)
+    if admin_ctx.role not in ("ops_manager", "admin"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role for operator onboarding")
+    return repo.list_operator_applications(status=status_filter, limit=limit)
+
+
+@router.patch("/ops/operator-applications/{application_id}", response_model=OperatorApplicationRecord)
+def update_operator_application(
+    application_id: UUID,
+    payload: UpdateOperatorApplicationRequest,
+    api_key: str = Depends(require_api_key),
+    admin_key: str = Depends(require_admin_key),
+    admin_ctx: AdminContext = Depends(require_admin_context),
+    repo: Repository = Depends(get_repo),
+) -> OperatorApplicationRecord:
+    _ = (api_key, admin_key, admin_ctx)
+    if admin_ctx.role not in ("ops_manager", "admin"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role for operator onboarding")
+    record = repo.update_operator_application(application_id, payload, reviewer_id=admin_ctx.user_id)
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Operator application not found")
+    return record
 
 
 @router.post("/ops/incidents", response_model=OpsIncident, status_code=status.HTTP_201_CREATED)

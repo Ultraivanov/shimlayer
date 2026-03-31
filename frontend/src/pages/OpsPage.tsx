@@ -10,6 +10,7 @@ import type {
   OpsMetrics,
   OpsMetricsHistoryPoint,
   OpsObservability,
+  OperatorApplicationRecord,
   Task,
   TaskAuditEntry,
   TaskWithReview,
@@ -35,7 +36,7 @@ const ACTION_PERMISSIONS: Record<string, Set<string>> = {
 };
 
 type SortMode = "updated_desc" | "created_desc" | "priority";
-type OpsView = "all" | "flows" | "incidents" | "finance" | "observability";
+type OpsView = "all" | "flows" | "incidents" | "finance" | "observability" | "operators";
 type FlowInspectorTab = "summary" | "context" | "result" | "artifacts" | "timeline";
 type TrendWindow = 12 | 24 | 48;
 type AutoRefreshSeconds = 0 | 15 | 30 | 60;
@@ -189,6 +190,13 @@ export function OpsPage() {
   const [audit, setAudit] = useState<TaskAuditEntry[]>([]);
   const [timeline, setTimeline] = useState<Array<{ at: string; kind: string; actor: string; message: string }>>([]);
   const [incidents, setIncidents] = useState<OpsIncident[]>([]);
+  const [operatorApplications, setOperatorApplications] = useState<OperatorApplicationRecord[]>([]);
+  const [operatorApplicationsLoading, setOperatorApplicationsLoading] = useState(false);
+  const [operatorApplicationsError, setOperatorApplicationsError] = useState("");
+  const [operatorStatusFilter, setOperatorStatusFilter] = useState<"pending" | "approved" | "rejected">("pending");
+  const [operatorNoteDrafts, setOperatorNoteDrafts] = useState<Record<string, string>>({});
+  const [operatorChatDrafts, setOperatorChatDrafts] = useState<Record<string, string>>({});
+  const [operatorActionId, setOperatorActionId] = useState<string>("");
 
   const [showOnlyProblem, setShowOnlyProblem] = useState<boolean>(() => loadFlag("ops.showOnlyProblem", false));
   const [showSlaBreachQueue, setShowSlaBreachQueue] = useState<boolean>(() => loadFlag("ops.showSlaBreachQueue", false));
@@ -289,6 +297,7 @@ export function OpsPage() {
   const role = config.adminRole || "admin";
   const rolePermissions = ACTION_PERMISSIONS[role] ?? ACTION_PERMISSIONS.admin;
   const canManageIncidents = role === "ops_manager" || role === "admin";
+  const canManageOperators = role === "ops_manager" || role === "admin";
   const canViewFinance = role === "finance" || role === "ops_manager" || role === "admin";
   const canSeeClaimOwner = role === "ops_manager" || role === "admin";
   const canTakeOverClaim = role === "ops_manager" || role === "admin";
@@ -1014,6 +1023,47 @@ export function OpsPage() {
     }
   }
 
+  async function reviewOperatorApplication(applicationId: string, status: "approved" | "rejected") {
+    if (!canManageOperators) return;
+    setOperatorActionId(applicationId);
+    setOperatorApplicationsError("");
+    try {
+      const note = operatorNoteDrafts[applicationId]?.trim() || null;
+      const chatId = operatorChatDrafts[applicationId]?.trim() || null;
+      const updated = await Api.updateOpsOperatorApplication(applicationId, {
+        status,
+        decision_note: note,
+        telegram_chat_id: chatId
+      });
+      setOperatorApplications((prev) => prev.map((row) => (row.id === applicationId ? updated : row)));
+      pushToast("success", `Application ${status}`);
+    } catch (e) {
+      pushToast("error", `Application update failed: ${String(e)}`);
+      setOperatorApplicationsError(String(e));
+    } finally {
+      setOperatorActionId("");
+    }
+  }
+
+  async function loadOperatorApplications(status: "pending" | "approved" | "rejected" = operatorStatusFilter) {
+    if (!canManageOperators) {
+      setOperatorApplications([]);
+      setOperatorApplicationsError("");
+      return;
+    }
+    setOperatorApplicationsLoading(true);
+    setOperatorApplicationsError("");
+    try {
+      const rows = await Api.listOpsOperatorApplications({ status, limit: 80 });
+      setOperatorApplications(rows);
+    } catch (e) {
+      setOperatorApplications([]);
+      setOperatorApplicationsError(String(e));
+    } finally {
+      setOperatorApplicationsLoading(false);
+    }
+  }
+
   async function refresh(options: { source?: "manual" | "auto" } = {}): Promise<{ ok: boolean; error?: string }> {
     if (refreshInFlightRef.current) return { ok: false, error: "refresh already in progress" };
     refreshInFlightRef.current = true;
@@ -1061,6 +1111,13 @@ export function OpsPage() {
         setMargin(null);
         setLedger([]);
       }
+      if (activeView === "operators") {
+        jobs.push(
+          loadOperatorApplications()
+            .then(() => null)
+            .catch((e) => `operator applications: ${String(e)}`)
+        );
+      }
 
       const errors = (await Promise.all(jobs)).filter((msg): msg is string => Boolean(msg));
       if (errors.length > 0) {
@@ -1091,8 +1148,14 @@ export function OpsPage() {
     statusFilter,
     taskTypeFilter,
     sortMode,
-    canViewFinance
+    canViewFinance,
+    activeView
   ]);
+
+  useEffect(() => {
+    if (activeView !== "operators") return;
+    void loadOperatorApplications();
+  }, [activeView, operatorStatusFilter, canManageOperators]);
 
   useEffect(() => {
     if (!showManualReviewQueue) return;
@@ -2011,6 +2074,13 @@ export function OpsPage() {
             disabled={!canViewFinance}
           >
             Finance {canViewFinance ? "" : "(locked)"}
+          </Button>
+          <Button
+            view={activeView === "operators" ? "action" : "outlined"}
+            onClick={() => setActiveView("operators")}
+            disabled={!canManageOperators}
+          >
+            Operators {canManageOperators ? "" : "(locked)"}
           </Button>
           <Button view={activeView === "observability" ? "action" : "outlined"} onClick={() => setActiveView("observability")}>Observability</Button>
         </div>
@@ -3339,6 +3409,100 @@ export function OpsPage() {
             </article>
           ))}
         </div>
+        </div>
+      </Card> : null}
+
+      {(activeView === "all" || activeView === "operators") ? <Card className="panel span-2">
+        <div className="section-head">
+          <h2>Operator onboarding</h2>
+          <div className="row-tight">
+            <Button view={operatorStatusFilter === "pending" ? "action" : "outlined"} onClick={() => setOperatorStatusFilter("pending")}>
+              Pending
+            </Button>
+            <Button view={operatorStatusFilter === "approved" ? "action" : "outlined"} onClick={() => setOperatorStatusFilter("approved")}>
+              Approved
+            </Button>
+            <Button view={operatorStatusFilter === "rejected" ? "action" : "outlined"} onClick={() => setOperatorStatusFilter("rejected")}>
+              Rejected
+            </Button>
+            <Button view="flat" onClick={() => void loadOperatorApplications()} disabled={operatorApplicationsLoading}>
+              Refresh
+            </Button>
+          </div>
+        </div>
+        {!canManageOperators ? <p className="muted">Your role cannot review operator applications.</p> : null}
+        <p className="muted">
+          Telegram setup: create a bot via BotFather and share onboarding instructions after approval. Collect chat IDs from operators so we can send tasks.
+        </p>
+        <div className="list">
+          {operatorApplicationsLoading ? <p className="muted">Loading applications…</p> : null}
+          {!operatorApplicationsLoading && operatorApplicationsError ? (
+            <p className="muted">error: {operatorApplicationsError}</p>
+          ) : null}
+          {!operatorApplicationsLoading && !operatorApplicationsError && operatorApplications.length === 0 ? (
+            <p className="muted">No applications in this state.</p>
+          ) : null}
+          {operatorApplications.map((app) => {
+            const noteValue = operatorNoteDrafts[app.id] ?? app.decision_note ?? "";
+            const chatValue = operatorChatDrafts[app.id] ?? app.telegram_chat_id ?? "";
+            return (
+              <article key={app.id} className="dlq-item" data-testid="ops-operator-application" data-application-id={app.id}>
+                <div className="dlq-head">
+                  <strong>{app.email}</strong>
+                  <span className={`status status-${app.status}`}>{app.status}</span>
+                </div>
+                <p className="muted">
+                  region: {app.region} · phone: {app.phone} · telegram: {app.telegram_handle}
+                </p>
+                {app.languages ? <p className="muted">languages: {app.languages}</p> : null}
+                {app.experience ? <p>{app.experience}</p> : null}
+                <p className="muted mono">
+                  id {shortId(app.id)} · submitted {new Date(app.created_at).toLocaleString()}
+                </p>
+                <div className="row-tight">
+                  <TextInput
+                    size="m"
+                    value={chatValue}
+                    onUpdate={(value) => setOperatorChatDrafts((prev) => ({ ...prev, [app.id]: value }))}
+                    placeholder="telegram chat id"
+                    disabled={!canManageOperators}
+                  />
+                  <TextArea
+                    size="s"
+                    value={noteValue}
+                    onUpdate={(value) => setOperatorNoteDrafts((prev) => ({ ...prev, [app.id]: value }))}
+                    placeholder="decision note"
+                    disabled={!canManageOperators}
+                  />
+                </div>
+                {app.reviewed_by ? (
+                  <p className="muted">
+                    reviewed by {app.reviewed_by} {app.reviewed_at ? `· ${new Date(app.reviewed_at).toLocaleString()}` : ""}
+                  </p>
+                ) : null}
+                {app.status === "pending" ? (
+                  <div className="row-tight">
+                    <Button
+                      view="action"
+                      onClick={() => void reviewOperatorApplication(app.id, "approved")}
+                      loading={operatorActionId === app.id}
+                      disabled={!canManageOperators || operatorActionId === app.id}
+                    >
+                      Approve
+                    </Button>
+                    <Button
+                      view="outlined"
+                      onClick={() => void reviewOperatorApplication(app.id, "rejected")}
+                      loading={operatorActionId === app.id}
+                      disabled={!canManageOperators || operatorActionId === app.id}
+                    >
+                      Reject
+                    </Button>
+                  </div>
+                ) : null}
+              </article>
+            );
+          })}
         </div>
       </Card> : null}
 

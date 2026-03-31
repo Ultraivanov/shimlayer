@@ -37,6 +37,40 @@ export type LeadRecord = {
   created_at: string;
 };
 
+export type OperatorApplicationCreateRequest = {
+  region: string;
+  email: string;
+  phone: string;
+  telegram_handle: string;
+  telegram_chat_id?: string | null;
+  experience?: string | null;
+  languages?: string | null;
+  source?: string | null;
+  page?: string | null;
+  metadata?: Record<string, unknown>;
+  website?: string | null;
+};
+
+export type OperatorApplicationRecord = {
+  id: string;
+  region: string;
+  email: string;
+  phone: string;
+  telegram_handle: string;
+  telegram_chat_id?: string | null;
+  experience?: string | null;
+  languages?: string | null;
+  status: "pending" | "approved" | "rejected" | string;
+  decision_note?: string | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  source?: string | null;
+  page?: string | null;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
 export type BalanceResponse = {
   account_id: string;
   balance_usd: number;

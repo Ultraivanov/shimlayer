@@ -31,6 +31,9 @@ from app.models import (
     OpsMetricsHistoryPoint,
     CreateLeadRequest,
     LeadRecord,
+    CreateOperatorApplicationRequest,
+    OperatorApplicationRecord,
+    UpdateOperatorApplicationRequest,
 )
 
 
@@ -62,6 +65,18 @@ class Repository(Protocol):
         meta: dict | None = None,
     ) -> None: ...
     def create_lead(self, payload: CreateLeadRequest) -> LeadRecord: ...
+    def create_operator_application(self, payload: CreateOperatorApplicationRequest) -> OperatorApplicationRecord: ...
+    def list_operator_applications(
+        self,
+        status: str | None = None,
+        limit: int = 50,
+    ) -> list[OperatorApplicationRecord]: ...
+    def update_operator_application(
+        self,
+        application_id: UUID,
+        payload: UpdateOperatorApplicationRequest,
+        reviewer_id: str,
+    ) -> OperatorApplicationRecord | None: ...
 
     def create_task(self, api_key: str, payload: CreateTaskRequest) -> Task: ...
     def list_account_tasks_with_review(

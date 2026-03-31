@@ -88,6 +88,35 @@ create index if not exists idx_leads_created
 create index if not exists idx_leads_email
   on public.leads(email);
 
+create table if not exists public.operator_applications (
+  id uuid primary key default uuid_generate_v4(),
+  region text not null,
+  email text not null,
+  phone text not null,
+  telegram_handle text not null,
+  telegram_chat_id text,
+  experience text,
+  languages text,
+  status text not null default 'pending',
+  decision_note text,
+  reviewed_by text,
+  reviewed_at timestamptz,
+  source text,
+  page text,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_operator_apps_created
+  on public.operator_applications(created_at desc);
+create index if not exists idx_operator_apps_status
+  on public.operator_applications(status, created_at desc);
+create index if not exists idx_operator_apps_email
+  on public.operator_applications(email);
+create index if not exists idx_operator_apps_telegram
+  on public.operator_applications(telegram_handle);
+
 alter table public.accounts
 add column if not exists flow_credits integer not null default 0;
 
@@ -445,6 +474,11 @@ for each row execute function public.set_updated_at();
 drop trigger if exists trg_webhook_jobs_updated_at on public.webhook_jobs;
 create trigger trg_webhook_jobs_updated_at
 before update on public.webhook_jobs
+for each row execute function public.set_updated_at();
+
+drop trigger if exists trg_operator_applications_updated_at on public.operator_applications;
+create trigger trg_operator_applications_updated_at
+before update on public.operator_applications
 for each row execute function public.set_updated_at();
 
 -- Enable RLS

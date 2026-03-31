@@ -131,6 +131,46 @@ class LeadRecord(BaseModel):
     created_at: datetime
 
 
+class CreateOperatorApplicationRequest(BaseModel):
+    region: str = Field(min_length=1, max_length=100)
+    email: str = Field(min_length=3, max_length=320)
+    phone: str = Field(min_length=3, max_length=50)
+    telegram_handle: str = Field(min_length=2, max_length=100)
+    telegram_chat_id: str | None = Field(default=None, max_length=100)
+    experience: str | None = Field(default=None, max_length=2000)
+    languages: str | None = Field(default=None, max_length=200)
+    source: str | None = Field(default=None, max_length=200)
+    page: str | None = Field(default=None, max_length=200)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    website: str | None = Field(default=None, max_length=200)
+
+
+class OperatorApplicationRecord(BaseModel):
+    id: UUID
+    region: str
+    email: str
+    phone: str
+    telegram_handle: str
+    telegram_chat_id: str | None = None
+    experience: str | None = None
+    languages: str | None = None
+    status: str
+    decision_note: str | None = None
+    reviewed_by: str | None = None
+    reviewed_at: datetime | None = None
+    source: str | None = None
+    page: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+    updated_at: datetime
+
+
+class UpdateOperatorApplicationRequest(BaseModel):
+    status: str = Field(pattern="^(approved|rejected)$")
+    decision_note: str | None = Field(default=None, max_length=2000)
+    telegram_chat_id: str | None = Field(default=None, max_length=100)
+
+
 class Artifact(BaseModel):
     id: UUID
     task_id: UUID

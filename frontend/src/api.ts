@@ -20,7 +20,9 @@ import type {
   OpenAIInterruptionRecord,
   OpenAIResumeResponse,
   LeadCreateRequest,
-  LeadRecord
+  LeadRecord,
+  OperatorApplicationCreateRequest,
+  OperatorApplicationRecord
 } from "./types";
 
 type Config = {
@@ -101,12 +103,26 @@ export const Api = {
   listPackages: () => http<PackageInfo[]>("/v1/billing/packages"),
   createLead: (payload: LeadCreateRequest) =>
     http<LeadRecord>("/v1/leads", { method: "POST", body: JSON.stringify(payload) }),
+  createOperatorApplication: (payload: OperatorApplicationCreateRequest) =>
+    http<OperatorApplicationRecord>("/v1/operator-applications", { method: "POST", body: JSON.stringify(payload) }),
   purchasePackage: (packageCode: string, reference: string) =>
     http("/v1/billing/packages/purchase", {
       method: "POST",
       body: JSON.stringify({ package_code: packageCode, reference })
     }),
   getBalance: () => http<BalanceResponse>("/v1/billing/balance"),
+  listOpsOperatorApplications: (params: { status?: string; limit?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (params.status) q.set("status_filter", params.status);
+    if (params.limit) q.set("limit", String(params.limit));
+    const suffix = q.toString() ? `?${q.toString()}` : "";
+    return http<OperatorApplicationRecord[]>(`/v1/ops/operator-applications${suffix}`, {}, true);
+  },
+  updateOpsOperatorApplication: (applicationId: string, payload: { status: string; decision_note?: string | null; telegram_chat_id?: string | null }) =>
+    http<OperatorApplicationRecord>(`/v1/ops/operator-applications/${applicationId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    }, true),
   createTask: (payload: Record<string, unknown>) =>
     http<Task>("/v1/tasks", { method: "POST", body: JSON.stringify(payload) }),
   createJudgment: (payload: Record<string, unknown>) =>
