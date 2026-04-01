@@ -473,6 +473,22 @@ def require_operator_key(
     return operator
 
 
+def require_operator_key_basic(
+    x_operator_key: str | None = Header(default=None, alias="X-Operator-Key"),
+    repo: Repository = Depends(get_repo),
+) -> OperatorRecord:
+    if not x_operator_key:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing operator key")
+    operator = repo.get_operator_by_token(x_operator_key)
+    if not operator or operator.status != "active":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid operator key")
+    try:
+        repo.consume_operator_rate_limit(operator.id, settings.shimlayer_operator_rate_limit_per_minute)
+    except RateLimitExceededError as exc:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
+    return operator
+
+
 def _notify_operator_decision(record: OperatorApplicationRecord) -> None:
     if not record.telegram_chat_id or record.status not in {"approved", "rejected"}:
         return
@@ -890,6 +906,21 @@ def operator_queue(
     else:
         rows = [r for r in rows if r.worker_id is None or r.worker_id == operator.id]
     return rows
+
+
+@router.get("/operator/me", response_model=OperatorRecord)
+def operator_me(
+    operator: OperatorRecord = Depends(require_operator_key_basic),
+) -> OperatorRecord:
+    return operator
+
+
+@router.get("/operator/deliveries/last", response_model=OperatorDeliveryRecord | None)
+def operator_last_delivery(
+    operator: OperatorRecord = Depends(require_operator_key_basic),
+    repo: Repository = Depends(get_repo),
+) -> OperatorDeliveryRecord | None:
+    return repo.get_operator_last_delivery(operator.id)
 
 
 @router.get("/operator/tasks/{task_id}", response_model=TaskWithReview)

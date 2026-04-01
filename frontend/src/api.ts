@@ -187,6 +187,8 @@ export const Api = {
     const suffix = q.toString() ? `?${q.toString()}` : "";
     return httpOperator<TaskWithReview[]>(`/v1/operator/queue${suffix}`);
   },
+  getOperatorMe: () => httpOperator<OperatorRecord>("/v1/operator/me"),
+  getOperatorLastDelivery: () => httpOperator<OperatorDeliveryRecord | null>("/v1/operator/deliveries/last"),
   getOperatorTask: (taskId: string) => httpOperator<TaskWithReview>(`/v1/operator/tasks/${taskId}`),
   claimOperatorTask: (taskId: string) => httpOperator<Task>(`/v1/operator/tasks/${taskId}/claim`, { method: "POST" }),
   completeOperatorTask: (taskId: string, result: Record<string, unknown>, workerNote?: string | null) =>

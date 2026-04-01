@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Card, Select, TextArea, TextInput } from "@gravity-ui/uikit";
 
 import { Api, config } from "../api";
-import type { OpenAIInterruptionRecord, OpenAIResumeResponse, Task, TaskWithReview } from "../types";
+import type { OpenAIInterruptionRecord, OpenAIResumeResponse, Task, TaskWithReview, OperatorRecord, OperatorDeliveryRecord } from "../types";
 import { ArtifactTile } from "../components/ArtifactTile";
 
 type ToastLevel = "success" | "error";
@@ -62,6 +62,9 @@ export function OperatorPage() {
   const [nowMs, setNowMs] = useState(() => Date.now());
   const refreshInFlightRef = useRef(false);
   const [showMoreActions, setShowMoreActions] = useState<boolean>(false);
+  const [operatorProfile, setOperatorProfile] = useState<OperatorRecord | null>(null);
+  const [operatorDelivery, setOperatorDelivery] = useState<OperatorDeliveryRecord | null>(null);
+  const [operatorProfileError, setOperatorProfileError] = useState<string>("");
 
   const proofFormRef = useRef<HTMLDivElement | null>(null);
   const [proofArtifactType, setProofArtifactType] = useState<string>("logs");
@@ -189,6 +192,19 @@ export function OperatorPage() {
   useEffect(() => {
     void refresh();
   }, []);
+
+  useEffect(() => {
+    if (!operatorMode) return;
+    setOperatorProfileError("");
+    void Promise.all([Api.getOperatorMe(), Api.getOperatorLastDelivery()])
+      .then(([me, last]) => {
+        setOperatorProfile(me);
+        setOperatorDelivery(last);
+      })
+      .catch((e) => {
+        setOperatorProfileError(String(e));
+      });
+  }, [operatorMode]);
 
   useEffect(() => {
     localStorage.setItem("operator.autoRefreshSeconds", String(autoRefreshSeconds));
@@ -834,6 +850,32 @@ export function OperatorPage() {
         <p className="muted" style={{ marginTop: 0 }}>
           Hotkeys: <span className="mono">j/k</span> navigate · <span className="mono">c</span> claim · <span className="mono">p</span> add proof · <span className="mono">Shift+Enter</span> complete
         </p>
+        {operatorMode ? (
+          <div className="detail-block">
+            <p className="muted" style={{ marginTop: 0 }}>Operator profile</p>
+            {operatorProfileError ? <p className="muted">profile error: {operatorProfileError}</p> : null}
+            {operatorProfile ? (
+              <div className="row-tight" style={{ alignItems: "center", flexWrap: "wrap" }}>
+                <span className="mono">id {operatorProfile.id.slice(0, 8)}</span>
+                <span className="muted">status: {operatorProfile.status}</span>
+                <span className="muted">verification: {operatorProfile.verification_status ?? "pending"}</span>
+                <span className="muted">chat: {operatorProfile.telegram_chat_id ? "linked" : "not linked"}</span>
+                {operatorProfile.verification_note ? <span className="muted">note: {operatorProfile.verification_note}</span> : null}
+              </div>
+            ) : null}
+            {operatorDelivery ? (
+              <p className="muted">
+                last delivery: {operatorDelivery.status} · {new Date(operatorDelivery.created_at).toLocaleString()}
+                {operatorDelivery.error ? ` · ${operatorDelivery.error}` : ""}
+              </p>
+            ) : null}
+            {!operatorProfile?.telegram_chat_id ? (
+              <p className="muted">
+                To link Telegram: send <span className="mono">/link &lt;token&gt;</span> to the bot.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
         {!selectedTask ? <p className="muted">Select a task from the queue to view details.</p> : null}
       {selectedTask ? (
           <>
