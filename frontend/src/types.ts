@@ -72,6 +72,20 @@ export type OperatorApplicationRecord = {
   updated_at: string;
 };
 
+export type OperatorRecord = {
+  id: string;
+  application_id: string;
+  status: string;
+  role: string;
+  region: string;
+  email: string;
+  phone: string;
+  telegram_handle: string;
+  telegram_chat_id?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type BalanceResponse = {
   account_id: string;
   balance_usd: number;

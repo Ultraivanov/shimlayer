@@ -757,6 +757,9 @@ class PostgresRepository:
                 if not operator:
                     conn.rollback()
                     return None
+                if operator.get("status") != "active":
+                    conn.rollback()
+                    return None
                 cur.execute(
                     """
                     select id
@@ -792,6 +795,101 @@ class PostgresRepository:
                         """,
                         (chat_id, row["application_id"]),
                     )
+            conn.commit()
+        if not row:
+            return None
+        return OperatorRecord(
+            id=row["id"],
+            application_id=row["application_id"],
+            status=row["status"],
+            role=row["role"],
+            region=row["region"],
+            email=row["email"],
+            phone=row["phone"],
+            telegram_handle=row["telegram_handle"],
+            telegram_chat_id=row.get("telegram_chat_id"),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    def rotate_operator_token(self, operator_id: UUID) -> tuple[OperatorRecord, str] | None:
+        token = f"op_{uuid4().hex}"
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    update public.operators
+                    set access_token = %s, updated_at = now()
+                    where id = %s
+                    returning id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id,
+                      created_at, updated_at
+                    """,
+                    (token, operator_id),
+                )
+                row = cur.fetchone()
+            conn.commit()
+        if not row:
+            return None
+        operator = OperatorRecord(
+            id=row["id"],
+            application_id=row["application_id"],
+            status=row["status"],
+            role=row["role"],
+            region=row["region"],
+            email=row["email"],
+            phone=row["phone"],
+            telegram_handle=row["telegram_handle"],
+            telegram_chat_id=row.get("telegram_chat_id"),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+        return operator, token
+
+    def update_operator_status(self, operator_id: UUID, status: str) -> OperatorRecord | None:
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    update public.operators
+                    set status = %s, updated_at = now()
+                    where id = %s
+                    returning id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id,
+                      created_at, updated_at
+                    """,
+                    (status, operator_id),
+                )
+                row = cur.fetchone()
+            conn.commit()
+        if not row:
+            return None
+        return OperatorRecord(
+            id=row["id"],
+            application_id=row["application_id"],
+            status=row["status"],
+            role=row["role"],
+            region=row["region"],
+            email=row["email"],
+            phone=row["phone"],
+            telegram_handle=row["telegram_handle"],
+            telegram_chat_id=row.get("telegram_chat_id"),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    def unlink_operator_chat(self, operator_id: UUID) -> OperatorRecord | None:
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    update public.operators
+                    set telegram_chat_id = null, updated_at = now()
+                    where id = %s
+                    returning id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id,
+                      created_at, updated_at
+                    """,
+                    (operator_id,),
+                )
+                row = cur.fetchone()
             conn.commit()
         if not row:
             return None

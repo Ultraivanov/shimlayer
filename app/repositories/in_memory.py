@@ -417,6 +417,8 @@ class InMemoryRepository:
             operator = self._operators.get(operator_id)
             if not operator:
                 return None
+            if operator.status != "active":
+                return None
             if operator.telegram_chat_id and operator.telegram_chat_id != chat_id:
                 return None
             now = utcnow()
@@ -427,6 +429,40 @@ class InMemoryRepository:
                 self._operator_applications[operator.application_id] = application.model_copy(
                     update={"telegram_chat_id": chat_id, "updated_at": now}
                 )
+            return updated
+
+    def rotate_operator_token(self, operator_id: UUID) -> tuple[OperatorRecord, str] | None:
+        with self._lock:
+            operator = self._operators.get(operator_id)
+            if not operator:
+                return None
+            old_token = self._operator_tokens_by_id.get(operator_id)
+            if old_token:
+                self._operator_ids_by_token.pop(old_token, None)
+            token = f"op_{uuid4().hex}"
+            now = utcnow()
+            updated = operator.model_copy(update={"updated_at": now})
+            self._operators[operator_id] = updated
+            self._operator_tokens_by_id[operator_id] = token
+            self._operator_ids_by_token[token] = operator_id
+            return updated, token
+
+    def update_operator_status(self, operator_id: UUID, status: str) -> OperatorRecord | None:
+        with self._lock:
+            operator = self._operators.get(operator_id)
+            if not operator:
+                return None
+            updated = operator.model_copy(update={"status": status, "updated_at": utcnow()})
+            self._operators[operator_id] = updated
+            return updated
+
+    def unlink_operator_chat(self, operator_id: UUID) -> OperatorRecord | None:
+        with self._lock:
+            operator = self._operators.get(operator_id)
+            if not operator:
+                return None
+            updated = operator.model_copy(update={"telegram_chat_id": None, "updated_at": utcnow()})
+            self._operators[operator_id] = updated
             return updated
 
     def create_task(self, api_key: str, payload: CreateTaskRequest) -> Task:

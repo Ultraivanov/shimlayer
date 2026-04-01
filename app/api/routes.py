@@ -55,6 +55,7 @@ from app.models import (
     OperatorApplicationRecord,
     OperatorApprovalResponse,
     OperatorRecord,
+    OperatorTokenRotateResponse,
     PackagePurchaseRequest,
     PackagePurchaseResponse,
     StuckRecoveryResult,
@@ -65,6 +66,7 @@ from app.models import (
     TopUpRequest,
     UpdateOpsIncidentRequest,
     UpdateOperatorApplicationRequest,
+    UpdateOperatorStatusRequest,
     WebhookDeadLetter,
     WebhookDelivery,
     LedgerEntry,
@@ -1616,6 +1618,76 @@ def list_operator_applications(
     if admin_ctx.role not in ("ops_manager", "admin"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role for operator onboarding")
     return repo.list_operator_applications(status=status_filter, limit=limit)
+
+
+@router.get("/ops/operators/{operator_id}", response_model=OperatorRecord)
+def get_operator(
+    operator_id: UUID,
+    api_key: str = Depends(require_api_key),
+    admin_key: str = Depends(require_admin_key),
+    admin_ctx: AdminContext = Depends(require_admin_context),
+    repo: Repository = Depends(get_repo),
+) -> OperatorRecord:
+    _ = (api_key, admin_key, admin_ctx)
+    if admin_ctx.role not in ("ops_manager", "admin"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role for operator onboarding")
+    operator = repo.get_operator(operator_id)
+    if not operator:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Operator not found")
+    return operator
+
+
+@router.post("/ops/operators/{operator_id}/rotate-token", response_model=OperatorTokenRotateResponse)
+def rotate_operator_token(
+    operator_id: UUID,
+    api_key: str = Depends(require_api_key),
+    admin_key: str = Depends(require_admin_key),
+    admin_ctx: AdminContext = Depends(require_admin_context),
+    repo: Repository = Depends(get_repo),
+) -> OperatorTokenRotateResponse:
+    _ = (api_key, admin_key, admin_ctx)
+    if admin_ctx.role not in ("ops_manager", "admin"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role for operator onboarding")
+    rotated = repo.rotate_operator_token(operator_id)
+    if not rotated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Operator not found")
+    operator, token = rotated
+    return OperatorTokenRotateResponse(operator=operator, operator_token=token)
+
+
+@router.post("/ops/operators/{operator_id}/status", response_model=OperatorRecord)
+def update_operator_status(
+    operator_id: UUID,
+    payload: UpdateOperatorStatusRequest,
+    api_key: str = Depends(require_api_key),
+    admin_key: str = Depends(require_admin_key),
+    admin_ctx: AdminContext = Depends(require_admin_context),
+    repo: Repository = Depends(get_repo),
+) -> OperatorRecord:
+    _ = (api_key, admin_key, admin_ctx)
+    if admin_ctx.role not in ("ops_manager", "admin"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role for operator onboarding")
+    operator = repo.update_operator_status(operator_id, payload.status)
+    if not operator:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Operator not found")
+    return operator
+
+
+@router.post("/ops/operators/{operator_id}/unlink-chat", response_model=OperatorRecord)
+def unlink_operator_chat(
+    operator_id: UUID,
+    api_key: str = Depends(require_api_key),
+    admin_key: str = Depends(require_admin_key),
+    admin_ctx: AdminContext = Depends(require_admin_context),
+    repo: Repository = Depends(get_repo),
+) -> OperatorRecord:
+    _ = (api_key, admin_key, admin_ctx)
+    if admin_ctx.role not in ("ops_manager", "admin"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role for operator onboarding")
+    operator = repo.unlink_operator_chat(operator_id)
+    if not operator:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Operator not found")
+    return operator
 
 
 @router.post("/ops/operator-applications/{application_id}/approve", response_model=OperatorApprovalResponse)

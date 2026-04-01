@@ -26,3 +26,4 @@
 ### Notes
 - If a chat is already linked, `/link` will reject to prevent hijacking.
 - Chat IDs can still be set manually in the Ops UI before approval.
+- Ops can rotate tokens, disable operators, or unlink chats from the Ops UI.

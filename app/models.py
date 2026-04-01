@@ -197,6 +197,15 @@ class OperatorApprovalResponse(BaseModel):
     operator_token: str
 
 
+class UpdateOperatorStatusRequest(BaseModel):
+    status: str = Field(pattern="^(active|disabled)$")
+
+
+class OperatorTokenRotateResponse(BaseModel):
+    operator: OperatorRecord
+    operator_token: str
+
+
 class Artifact(BaseModel):
     id: UUID
     task_id: UUID

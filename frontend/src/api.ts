@@ -22,7 +22,8 @@ import type {
   LeadCreateRequest,
   LeadRecord,
   OperatorApplicationCreateRequest,
-  OperatorApplicationRecord
+  OperatorApplicationRecord,
+  OperatorRecord
 } from "./types";
 
 type Config = {
@@ -150,6 +151,18 @@ export const Api = {
       },
       true
     ),
+  getOpsOperator: (operatorId: string) =>
+    http<OperatorRecord>(`/v1/ops/operators/${operatorId}`, {}, true),
+  rotateOpsOperatorToken: (operatorId: string) =>
+    http<{ operator: OperatorRecord; operator_token: string }>(`/v1/ops/operators/${operatorId}/rotate-token`, { method: "POST" }, true),
+  updateOpsOperatorStatus: (operatorId: string, status: "active" | "disabled") =>
+    http<OperatorRecord>(
+      `/v1/ops/operators/${operatorId}/status`,
+      { method: "POST", body: JSON.stringify({ status }) },
+      true
+    ),
+  unlinkOpsOperatorChat: (operatorId: string) =>
+    http<OperatorRecord>(`/v1/ops/operators/${operatorId}/unlink-chat`, { method: "POST" }, true),
   notifyOperatorTask: (operatorId: string, payload: { task_id: string; message?: string | null }) =>
     http(`/v1/ops/operators/${operatorId}/notify-task`, {
       method: "POST",

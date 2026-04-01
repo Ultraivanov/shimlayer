@@ -201,6 +201,9 @@ export function OpsPage() {
   const [operatorIdsByApplication, setOperatorIdsByApplication] = useState<Record<string, string>>({});
   const [operatorTaskDrafts, setOperatorTaskDrafts] = useState<Record<string, string>>({});
   const [operatorNotifyId, setOperatorNotifyId] = useState<string>("");
+  const [operatorStatusById, setOperatorStatusById] = useState<Record<string, string>>({});
+  const [operatorChatById, setOperatorChatById] = useState<Record<string, string>>({});
+  const [operatorManageId, setOperatorManageId] = useState<string>("");
 
   const [showOnlyProblem, setShowOnlyProblem] = useState<boolean>(() => loadFlag("ops.showOnlyProblem", false));
   const [showSlaBreachQueue, setShowSlaBreachQueue] = useState<boolean>(() => loadFlag("ops.showSlaBreachQueue", false));
@@ -1080,6 +1083,73 @@ export function OpsPage() {
     }
   }
 
+  async function loadOperatorDetails(operatorId: string) {
+    if (!canManageOperators) return;
+    try {
+      const operator = await Api.getOpsOperator(operatorId);
+      setOperatorStatusById((prev) => ({ ...prev, [operatorId]: operator.status }));
+      if (operator.telegram_chat_id) {
+        setOperatorChatById((prev) => ({ ...prev, [operatorId]: operator.telegram_chat_id as string }));
+      } else {
+        setOperatorChatById((prev) => {
+          const next = { ...prev };
+          delete next[operatorId];
+          return next;
+        });
+      }
+    } catch (e) {
+      pushToast("error", `Operator load failed: ${String(e)}`);
+    }
+  }
+
+  async function rotateOperatorToken(applicationId: string, operatorId: string) {
+    if (!canManageOperators) return;
+    setOperatorManageId(operatorId);
+    try {
+      const res = await Api.rotateOpsOperatorToken(operatorId);
+      setOperatorTokensById((prev) => ({ ...prev, [applicationId]: res.operator_token }));
+      setOperatorStatusById((prev) => ({ ...prev, [operatorId]: res.operator.status }));
+      pushToast("success", "Operator token rotated");
+    } catch (e) {
+      pushToast("error", `Rotate failed: ${String(e)}`);
+    } finally {
+      setOperatorManageId("");
+    }
+  }
+
+  async function toggleOperatorStatus(operatorId: string, nextStatus: "active" | "disabled") {
+    if (!canManageOperators) return;
+    setOperatorManageId(operatorId);
+    try {
+      const operator = await Api.updateOpsOperatorStatus(operatorId, nextStatus);
+      setOperatorStatusById((prev) => ({ ...prev, [operatorId]: operator.status }));
+      pushToast("success", `Operator ${operator.status}`);
+    } catch (e) {
+      pushToast("error", `Status update failed: ${String(e)}`);
+    } finally {
+      setOperatorManageId("");
+    }
+  }
+
+  async function unlinkOperatorChat(operatorId: string) {
+    if (!canManageOperators) return;
+    setOperatorManageId(operatorId);
+    try {
+      const operator = await Api.unlinkOpsOperatorChat(operatorId);
+      setOperatorChatById((prev) => {
+        const next = { ...prev };
+        delete next[operatorId];
+        return next;
+      });
+      setOperatorStatusById((prev) => ({ ...prev, [operatorId]: operator.status }));
+      pushToast("success", "Operator chat unlinked");
+    } catch (e) {
+      pushToast("error", `Unlink failed: ${String(e)}`);
+    } finally {
+      setOperatorManageId("");
+    }
+  }
+
   async function loadOperatorApplications(status: "pending" | "approved" | "rejected" = operatorStatusFilter) {
     if (!canManageOperators) {
       setOperatorApplications([]);
@@ -1205,6 +1275,17 @@ export function OpsPage() {
       return next;
     });
   }, [operatorApplications]);
+
+  useEffect(() => {
+    if (!canManageOperators) return;
+    const ids = Object.values(operatorIdsByApplication).filter(Boolean);
+    if (ids.length === 0) return;
+    ids.forEach((operatorId) => {
+      if (!operatorStatusById[operatorId]) {
+        void loadOperatorDetails(operatorId);
+      }
+    });
+  }, [operatorIdsByApplication, operatorStatusById, canManageOperators]);
 
   useEffect(() => {
     if (!showManualReviewQueue) return;
@@ -3550,6 +3631,8 @@ export function OpsPage() {
                 {app.status === "approved" && operatorId ? (
                   <div className="row-tight">
                     <span className="mono">operator id: {operatorId}</span>
+                    <span className="muted">status: {operatorStatusById[operatorId] ?? "unknown"}</span>
+                    {operatorChatById[operatorId] ? <span className="muted">chat: linked</span> : <span className="muted">chat: none</span>}
                     <TextInput
                       size="s"
                       value={operatorTaskDrafts[app.id] ?? ""}
@@ -3565,6 +3648,35 @@ export function OpsPage() {
                       disabled={!canManageOperators || operatorNotifyId === app.id}
                     >
                       Send task
+                    </Button>
+                    <Button
+                      size="s"
+                      view="outlined"
+                      onClick={() => void rotateOperatorToken(app.id, operatorId)}
+                      loading={operatorManageId === operatorId}
+                      disabled={!canManageOperators || operatorManageId === operatorId}
+                    >
+                      Rotate token
+                    </Button>
+                    <Button
+                      size="s"
+                      view="outlined"
+                      onClick={() =>
+                        void toggleOperatorStatus(operatorId, operatorStatusById[operatorId] === "disabled" ? "active" : "disabled")
+                      }
+                      loading={operatorManageId === operatorId}
+                      disabled={!canManageOperators || operatorManageId === operatorId}
+                    >
+                      {operatorStatusById[operatorId] === "disabled" ? "Enable" : "Disable"}
+                    </Button>
+                    <Button
+                      size="s"
+                      view="outlined"
+                      onClick={() => void unlinkOperatorChat(operatorId)}
+                      loading={operatorManageId === operatorId}
+                      disabled={!canManageOperators || operatorManageId === operatorId}
+                    >
+                      Unlink chat
                     </Button>
                   </div>
                 ) : null}
