@@ -18,6 +18,14 @@ def main() -> None:
                 (settings.shimlayer_retention_api_rate_windows_hours,),
             )
             api_rate_deleted = cur.rowcount
+            cur.execute(
+                """
+                delete from public.operator_rate_windows
+                where window_start < now() - (%s || ' hours')::interval
+                """,
+                (settings.shimlayer_retention_api_rate_windows_hours,),
+            )
+            operator_rate_deleted = cur.rowcount
 
             cur.execute(
                 """
@@ -68,6 +76,7 @@ def main() -> None:
         "Cleanup done:",
         {
             "api_rate_windows_deleted": api_rate_deleted,
+            "operator_rate_windows_deleted": operator_rate_deleted,
             "webhook_deliveries_deleted": deliveries_deleted,
             "succeeded_webhook_jobs_deleted": succeeded_jobs_deleted,
             "artifact_local_files_deleted": local_files_deleted,

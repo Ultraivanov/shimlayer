@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     shimlayer_retention_webhook_deliveries_days: int = 30
     shimlayer_retention_succeeded_jobs_days: int = 7
     shimlayer_retention_api_rate_windows_hours: int = 48
+    shimlayer_operator_rate_limit_per_minute: int = 120
     shimlayer_retention_artifacts_days: int = 30
     shimlayer_stripe_secret_key: str | None = None
     shimlayer_stripe_publishable_key: str | None = None

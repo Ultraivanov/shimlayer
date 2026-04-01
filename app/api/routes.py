@@ -464,6 +464,10 @@ def require_operator_key(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid operator key")
     if operator.verification_status != "verified":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operator not verified")
+    try:
+        repo.consume_operator_rate_limit(operator.id, settings.shimlayer_operator_rate_limit_per_minute)
+    except RateLimitExceededError as exc:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
     return operator
 
 

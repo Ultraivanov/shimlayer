@@ -142,6 +142,25 @@ class PostgresRepository:
                     raise RateLimitExceededError("Rate limit exceeded: free plan allows 10 requests per minute")
             conn.commit()
 
+    def consume_operator_rate_limit(self, operator_id: UUID, limit_per_minute: int) -> None:
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    insert into public.operator_rate_windows (operator_id, window_start, request_count)
+                    values (%s, date_trunc('minute', now()), 1)
+                    on conflict (operator_id, window_start)
+                    do update set request_count = public.operator_rate_windows.request_count + 1
+                    returning request_count
+                    """,
+                    (operator_id,),
+                )
+                count = int(cur.fetchone()["request_count"])
+                if count > limit_per_minute:
+                    conn.rollback()
+                    raise RateLimitExceededError("Operator rate limit exceeded")
+            conn.commit()
+
     def get_balance(self, api_key: str) -> BalanceResponse:
         with self._conn() as conn:
             account_id, balance, flow_credits = self._get_or_create_account(conn, api_key)

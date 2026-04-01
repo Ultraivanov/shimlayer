@@ -173,6 +173,16 @@ create table if not exists public.api_rate_windows (
 create index if not exists idx_api_rate_windows_window
   on public.api_rate_windows(window_start);
 
+create table if not exists public.operator_rate_windows (
+  operator_id uuid not null references public.operators(id) on delete cascade,
+  window_start timestamptz not null,
+  request_count integer not null default 0,
+  primary key (operator_id, window_start)
+);
+
+create index if not exists idx_operator_rate_windows_window
+  on public.operator_rate_windows(window_start);
+
 insert into public.package_catalog (code, flows, price_usd, active)
 values
   ('indie_entry_150', 150, 255.00, true),

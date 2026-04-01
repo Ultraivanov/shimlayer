@@ -57,6 +57,7 @@ class InMemoryRepository:
         self._lock = RLock()
         self._accounts: dict[str, dict] = {}
         self._rate_windows: dict[tuple[str, datetime], int] = {}
+        self._operator_rate_windows: dict[tuple[UUID, datetime], int] = {}
         self._ledger: list[dict] = []
         self._tasks: dict[UUID, Task] = {}
         self._artifacts: dict[UUID, list[Artifact]] = {}
@@ -129,6 +130,16 @@ class InMemoryRepository:
             if count >= 10:
                 raise RateLimitExceededError("Rate limit exceeded: free plan allows 10 requests per minute")
             self._rate_windows[key] = count + 1
+
+    def consume_operator_rate_limit(self, operator_id: UUID, limit_per_minute: int) -> None:
+        with self._lock:
+            now = utcnow()
+            bucket = now.replace(second=0, microsecond=0, tzinfo=timezone.utc)
+            key = (operator_id, bucket)
+            count = self._operator_rate_windows.get(key, 0)
+            if count >= limit_per_minute:
+                raise RateLimitExceededError("Operator rate limit exceeded")
+            self._operator_rate_windows[key] = count + 1
 
     def get_balance(self, api_key: str) -> BalanceResponse:
         with self._lock:
