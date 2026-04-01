@@ -33,6 +33,7 @@ from app.models import (
     LeadRecord,
     CreateOperatorApplicationRequest,
     OperatorApplicationRecord,
+    OperatorRecord,
     UpdateOperatorApplicationRequest,
 )
 
@@ -77,6 +78,15 @@ class Repository(Protocol):
         payload: UpdateOperatorApplicationRequest,
         reviewer_id: str,
     ) -> OperatorApplicationRecord | None: ...
+    def create_operator_from_application(
+        self,
+        application_id: UUID,
+        reviewer_id: str,
+    ) -> tuple[OperatorRecord, str] | None: ...
+    def get_operator_by_token(self, token: str) -> OperatorRecord | None: ...
+    def get_operator(self, operator_id: UUID) -> OperatorRecord | None: ...
+    def get_operator_by_chat_id(self, chat_id: str) -> OperatorRecord | None: ...
+    def link_operator_chat_id(self, token: str, chat_id: str) -> OperatorRecord | None: ...
 
     def create_task(self, api_key: str, payload: CreateTaskRequest) -> Task: ...
     def list_account_tasks_with_review(

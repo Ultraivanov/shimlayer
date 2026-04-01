@@ -158,6 +158,7 @@ class OperatorApplicationRecord(BaseModel):
     decision_note: str | None = None
     reviewed_by: str | None = None
     reviewed_at: datetime | None = None
+    operator_id: UUID | None = None
     source: str | None = None
     page: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -169,6 +170,31 @@ class UpdateOperatorApplicationRequest(BaseModel):
     status: str = Field(pattern="^(approved|rejected)$")
     decision_note: str | None = Field(default=None, max_length=2000)
     telegram_chat_id: str | None = Field(default=None, max_length=100)
+
+
+class ApproveOperatorApplicationRequest(BaseModel):
+    decision_note: str | None = Field(default=None, max_length=2000)
+    telegram_chat_id: str | None = Field(default=None, max_length=100)
+
+
+class OperatorRecord(BaseModel):
+    id: UUID
+    application_id: UUID
+    status: str
+    role: str
+    region: str
+    email: str
+    phone: str
+    telegram_handle: str
+    telegram_chat_id: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class OperatorApprovalResponse(BaseModel):
+    application: OperatorApplicationRecord
+    operator: OperatorRecord
+    operator_token: str
 
 
 class Artifact(BaseModel):

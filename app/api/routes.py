@@ -26,6 +26,7 @@ from app.models import (
     CreateLeadRequest,
     CreateOperatorApplicationRequest,
     CreateOpsIncidentRequest,
+    ApproveOperatorApplicationRequest,
     StripeCheckoutSessionRequest,
     StripeCheckoutSessionResponse,
     CreateJudgmentRequest,
@@ -52,6 +53,8 @@ from app.models import (
     PackageInfo,
     LeadRecord,
     OperatorApplicationRecord,
+    OperatorApprovalResponse,
+    OperatorRecord,
     PackagePurchaseRequest,
     PackagePurchaseResponse,
     StuckRecoveryResult,
@@ -113,6 +116,14 @@ def _is_sha256_hex(value: str | None) -> bool:
     return True
 
 
+def is_uuid_string(value: str) -> bool:
+    try:
+        UUID(str(value))
+        return True
+    except Exception:
+        return False
+
+
 def _has_quality_proof(task: TaskWithReview) -> bool:
     for artifact in task.artifacts:
         if str(artifact.storage_path).startswith("local:"):
@@ -121,6 +132,24 @@ def _has_quality_proof(task: TaskWithReview) -> bool:
         if _is_sha256_hex(checksum):
             return True
     return False
+
+
+def _require_operator_task(
+    task_id: UUID,
+    operator: OperatorRecord,
+    repo: Repository,
+    require_claimed: bool = False,
+) -> TaskWithReview:
+    task = repo.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+    if task.status not in ("queued", "claimed"):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Task not available")
+    if task.worker_id and task.worker_id != operator.id:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Task claimed by another operator")
+    if require_claimed and task.worker_id != operator.id:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Task must be claimed before action")
+    return task
 
 
 def _auto_create_sla_incident_if_needed(
@@ -421,9 +450,42 @@ def require_admin_context(
     return AdminContext(role=x_admin_role, user_id=x_admin_user)
 
 
+def require_operator_key(
+    x_operator_key: str | None = Header(default=None, alias="X-Operator-Key"),
+    repo: Repository = Depends(get_repo),
+) -> OperatorRecord:
+    if not x_operator_key:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing operator key")
+    operator = repo.get_operator_by_token(x_operator_key)
+    if not operator or operator.status != "active":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid operator key")
+    return operator
+
+
+def _notify_operator_decision(record: OperatorApplicationRecord) -> None:
+    if not record.telegram_chat_id or record.status not in {"approved", "rejected"}:
+        return
+    if record.status == "approved":
+        message = (
+            "✅ You are approved for ShimLayer operator onboarding. "
+            "We’ll share task access and onboarding steps here."
+        )
+    else:
+        message = (
+            "Thank you for applying to ShimLayer. "
+            "We can’t approve your application right now, but we’ll keep your details on file."
+        )
+    _ = send_telegram_message(record.telegram_chat_id, message)
+
+
 class _TaskSyncCursor(BaseModel):
     updated_at: datetime
     task_id: UUID
+
+
+class _OperatorNotifyTaskRequest(BaseModel):
+    task_id: UUID
+    message: str | None = None
 
 
 def _encode_task_sync_cursor(updated_at: datetime, task_id: UUID) -> str:
@@ -784,6 +846,152 @@ async def upload_artifact_multipart(
         task_id,
         CreateArtifactRequest(
             artifact_type=at,
+            storage_path=storage_path,
+            checksum_sha256=checksum,
+            metadata=metadata,
+        ),
+    )
+    if not artifact:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+    return artifact
+
+
+@router.get("/operator/queue", response_model=list[TaskWithReview])
+def operator_queue(
+    status_filter: str | None = None,
+    task_type: str | None = None,
+    only_manual_review: bool = False,
+    mine_only: bool = False,
+    limit: int = 100,
+    operator: OperatorRecord = Depends(require_operator_key),
+    repo: Repository = Depends(get_repo),
+) -> list[TaskWithReview]:
+    rows = repo.list_tasks_with_review(
+        limit=limit,
+        status=status_filter,
+        task_type=task_type,
+        only_manual_review=only_manual_review,
+    )
+    if not status_filter:
+        rows = [r for r in rows if r.status in ("queued", "claimed")]
+    if mine_only or status_filter == "claimed":
+        rows = [r for r in rows if r.worker_id == operator.id]
+    else:
+        rows = [r for r in rows if r.worker_id is None or r.worker_id == operator.id]
+    return rows
+
+
+@router.get("/operator/tasks/{task_id}", response_model=TaskWithReview)
+def operator_get_task(
+    task_id: UUID,
+    operator: OperatorRecord = Depends(require_operator_key),
+    repo: Repository = Depends(get_repo),
+) -> TaskWithReview:
+    return _require_operator_task(task_id, operator, repo, require_claimed=False)
+
+
+@router.post("/operator/tasks/{task_id}/claim", response_model=Task)
+def operator_claim_task(
+    task_id: UUID,
+    operator: OperatorRecord = Depends(require_operator_key),
+    repo: Repository = Depends(get_repo),
+) -> Task:
+    task = _require_operator_task(task_id, operator, repo, require_claimed=False)
+    if task.status == "claimed" and task.worker_id == operator.id:
+        return task
+    claimed = repo.claim_task(task_id, worker_id=operator.id)
+    if not claimed:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Task unavailable")
+    repo.enqueue_task_webhook(claimed, settings.shimlayer_webhook_max_attempts)
+    return claimed
+
+
+@router.post("/operator/tasks/{task_id}/complete", response_model=Task)
+def operator_complete_task(
+    task_id: UUID,
+    payload: CompleteTaskRequest,
+    operator: OperatorRecord = Depends(require_operator_key),
+    repo: Repository = Depends(get_repo),
+) -> Task:
+    existing = _require_operator_task(task_id, operator, repo, require_claimed=True)
+    if not _has_quality_proof(existing):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Quality proof artifact required before completion",
+        )
+    try:
+        if existing.task_type == TaskType.STUCK_RECOVERY:
+            StuckRecoveryResult.model_validate(payload.result)
+        elif existing.task_type == TaskType.QUICK_JUDGMENT:
+            QuickJudgmentResult.model_validate(payload.result)
+    except ValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid result payload") from exc
+    task = repo.complete_task(task_id, result=payload.result, worker_note=payload.worker_note)
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found or invalid state")
+    repo.enqueue_task_webhook(task, settings.shimlayer_webhook_max_attempts)
+    return task
+
+
+@router.post("/operator/tasks/{task_id}/proof", response_model=Artifact, status_code=status.HTTP_201_CREATED)
+def operator_register_proof(
+    task_id: UUID,
+    payload: CreateArtifactRequest,
+    operator: OperatorRecord = Depends(require_operator_key),
+    repo: Repository = Depends(get_repo),
+) -> Artifact:
+    _ = _require_operator_task(task_id, operator, repo, require_claimed=True)
+    checksum = payload.checksum_sha256
+    if checksum is not None:
+        checksum = str(checksum).lower()
+        if not _is_sha256_hex(checksum):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid checksum_sha256")
+
+    if str(payload.storage_path).startswith("local:"):
+        try:
+            content = load_local_artifact(base_dir=settings.shimlayer_artifacts_dir, storage_path=payload.storage_path)
+        except Exception as exc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artifact content not found") from exc
+        actual = hashlib.sha256(content).hexdigest()
+        if checksum is not None and checksum != actual:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Checksum mismatch")
+        checksum = actual
+
+    artifact = repo.add_artifact(
+        task_id,
+        payload.model_copy(update={"checksum_sha256": checksum}),
+    )
+    if not artifact:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+    return artifact
+
+
+@router.post("/operator/tasks/{task_id}/artifacts/upload", response_model=Artifact, status_code=status.HTTP_201_CREATED)
+def operator_upload_artifact(
+    task_id: UUID,
+    payload: UploadArtifactRequest,
+    operator: OperatorRecord = Depends(require_operator_key),
+    repo: Repository = Depends(get_repo),
+) -> Artifact:
+    _ = _require_operator_task(task_id, operator, repo, require_claimed=True)
+    try:
+        content = base64.b64decode(payload.content_base64, validate=True)
+    except binascii.Error as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid base64 content") from exc
+
+    storage_path, checksum, metadata = save_local_artifact(
+        base_dir=settings.shimlayer_artifacts_dir,
+        task_id=task_id,
+        artifact_type=payload.artifact_type,
+        content=content,
+        filename=payload.filename,
+        content_type=payload.content_type,
+        extra_metadata=payload.metadata,
+    )
+    artifact = repo.add_artifact(
+        task_id,
+        CreateArtifactRequest(
+            artifact_type=payload.artifact_type,
             storage_path=storage_path,
             checksum_sha256=checksum,
             metadata=metadata,
@@ -1200,6 +1408,94 @@ async def stripe_webhook(
     return {"processed": False, "idempotent": False, "reason": "event ignored"}
 
 
+@router.post("/telegram/webhook")
+async def telegram_webhook(
+    request: Request,
+    repo: Repository = Depends(get_repo),
+) -> dict[str, str | bool]:
+    payload = await request.json()
+    message = payload.get("message") or {}
+    callback = payload.get("callback_query") or {}
+    chat = message.get("chat") or (callback.get("message") or {}).get("chat") or {}
+    chat_id = chat.get("id")
+    if chat_id is None:
+        return {"ok": True, "ignored": "no_chat"}
+    text = str(message.get("text") or "").strip()
+    callback_data = str(callback.get("data") or "").strip()
+    cmd = callback_data or text
+    if not cmd:
+        return {"ok": True}
+
+    def _extract_task_id(raw: str, prefix: str) -> str:
+        if raw.startswith(f"/{prefix}"):
+            return raw[len(prefix) + 1 :].strip()
+        if raw.startswith(f"{prefix}:"):
+            return raw.split(":", 1)[1].strip()
+        return ""
+
+    def _extract_token(raw: str) -> str:
+        token = _extract_task_id(raw, "start")
+        if not token:
+            token = _extract_task_id(raw, "link")
+        return token
+
+    if cmd.startswith("/start") or cmd.startswith("/help") or cmd.startswith("/link") or cmd.startswith("link:"):
+        token = _extract_token(cmd)
+        if token:
+            linked = repo.link_operator_chat_id(token, str(chat_id))
+            if linked:
+                send_telegram_message(
+                    str(chat_id),
+                    "✅ Operator linked. Use /claim <task_id> to accept tasks, /skip <task_id> to skip.",
+                )
+                return {"ok": True}
+            send_telegram_message(
+                str(chat_id),
+                "Invalid or already-linked token. Ask ops for a fresh token.",
+            )
+            return {"ok": True}
+        send_telegram_message(
+            str(chat_id),
+            "ShimLayer operator bot. Use /link <token> to connect, then /claim <task_id>.",
+        )
+        return {"ok": True}
+
+    operator = repo.get_operator_by_chat_id(str(chat_id))
+    if not operator:
+        send_telegram_message(
+            str(chat_id),
+            "Operator not linked yet. Use /link <token> from ops to connect.",
+        )
+        return {"ok": True, "ignored": "unknown_operator"}
+
+    if cmd.startswith("/claim") or cmd.startswith("claim:"):
+        task_id = _extract_task_id(cmd, "claim")
+        if not task_id:
+            send_telegram_message(str(chat_id), "Missing task_id. Use /claim <task_id>.")
+            return {"ok": True}
+        task = repo.get_task(UUID(task_id)) if is_uuid_string(task_id) else None
+        if not task:
+            send_telegram_message(str(chat_id), "Task not found.")
+            return {"ok": True}
+        claimed = repo.claim_task(UUID(task_id), worker_id=operator.id)
+        if not claimed:
+            send_telegram_message(str(chat_id), "Task is unavailable or already claimed.")
+            return {"ok": True}
+        repo.enqueue_task_webhook(claimed, settings.shimlayer_webhook_max_attempts)
+        send_telegram_message(str(chat_id), f"✅ Claimed {task_id}.")
+        return {"ok": True}
+
+    if cmd.startswith("/skip") or cmd.startswith("skip:"):
+        task_id = _extract_task_id(cmd, "skip")
+        if not task_id:
+            send_telegram_message(str(chat_id), "Missing task_id. Use /skip <task_id>.")
+            return {"ok": True}
+        send_telegram_message(str(chat_id), f"Skipped {task_id}.")
+        return {"ok": True}
+
+    return {"ok": True, "ignored": "unknown_command"}
+
+
 @router.get("/ops/metrics", response_model=OpsMetricsResponse)
 def ops_metrics(
     api_key: str = Depends(require_api_key),
@@ -1322,6 +1618,37 @@ def list_operator_applications(
     return repo.list_operator_applications(status=status_filter, limit=limit)
 
 
+@router.post("/ops/operator-applications/{application_id}/approve", response_model=OperatorApprovalResponse)
+def approve_operator_application(
+    application_id: UUID,
+    payload: ApproveOperatorApplicationRequest,
+    api_key: str = Depends(require_api_key),
+    admin_key: str = Depends(require_admin_key),
+    admin_ctx: AdminContext = Depends(require_admin_context),
+    repo: Repository = Depends(get_repo),
+) -> OperatorApprovalResponse:
+    _ = (api_key, admin_key, admin_ctx)
+    if admin_ctx.role not in ("ops_manager", "admin"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role for operator onboarding")
+    updated = repo.update_operator_application(
+        application_id,
+        UpdateOperatorApplicationRequest(
+            status="approved",
+            decision_note=payload.decision_note,
+            telegram_chat_id=payload.telegram_chat_id,
+        ),
+        reviewer_id=admin_ctx.user_id,
+    )
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Operator application not found")
+    created = repo.create_operator_from_application(application_id, reviewer_id=admin_ctx.user_id)
+    if not created:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Operator application not found")
+    _notify_operator_decision(updated)
+    operator, token = created
+    return OperatorApprovalResponse(application=updated, operator=operator, operator_token=token)
+
+
 @router.patch("/ops/operator-applications/{application_id}", response_model=OperatorApplicationRecord)
 def update_operator_application(
     application_id: UUID,
@@ -1337,19 +1664,43 @@ def update_operator_application(
     record = repo.update_operator_application(application_id, payload, reviewer_id=admin_ctx.user_id)
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Operator application not found")
-    if record.telegram_chat_id and record.status in {"approved", "rejected"}:
-        if record.status == "approved":
-            message = (
-                "✅ You are approved for ShimLayer operator onboarding. "
-                "We’ll share task access and onboarding steps here."
-            )
-        else:
-            message = (
-                "Thank you for applying to ShimLayer. "
-                "We can’t approve your application right now, but we’ll keep your details on file."
-            )
-        _ = send_telegram_message(record.telegram_chat_id, message)
+    _notify_operator_decision(record)
     return record
+
+
+@router.post("/ops/operators/{operator_id}/notify-task")
+def notify_operator_task(
+    operator_id: UUID,
+    payload: _OperatorNotifyTaskRequest,
+    api_key: str = Depends(require_api_key),
+    admin_key: str = Depends(require_admin_key),
+    admin_ctx: AdminContext = Depends(require_admin_context),
+    repo: Repository = Depends(get_repo),
+) -> dict:
+    _ = (api_key, admin_key, admin_ctx)
+    if admin_ctx.role not in ("ops_manager", "admin"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role for operator notify")
+    operator = repo.get_operator(operator_id)
+    if not operator or not operator.telegram_chat_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Operator or chat_id not found")
+    task = repo.get_task(payload.task_id)
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+    text = payload.message or (
+        f"New task {task.id}\n"
+        f"type: {task.task_type}\n"
+        "Reply /claim <task_id> to take it, or /skip <task_id> to skip."
+    )
+    reply_markup = {
+        "inline_keyboard": [
+            [
+                {"text": "Claim", "callback_data": f"claim:{task.id}"},
+                {"text": "Skip", "callback_data": f"skip:{task.id}"},
+            ]
+        ]
+    }
+    sent = send_telegram_message(operator.telegram_chat_id, text, reply_markup=reply_markup)
+    return {"sent": sent}
 
 
 @router.post("/ops/incidents", response_model=OpsIncident, status_code=status.HTTP_201_CREATED)

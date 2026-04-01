@@ -31,6 +31,7 @@ type Config = {
   adminKey: string;
   adminRole: string;
   adminUser: string;
+  operatorKey: string;
 };
 
 type OpsFlowListParams = {
@@ -47,7 +48,8 @@ export const config: Config = {
   apiKey: import.meta.env.VITE_API_KEY ?? "demo-key",
   adminKey: import.meta.env.VITE_ADMIN_KEY ?? "dev-admin-key",
   adminRole: import.meta.env.VITE_ADMIN_ROLE ?? "admin",
-  adminUser: import.meta.env.VITE_ADMIN_USER ?? "local-admin"
+  adminUser: import.meta.env.VITE_ADMIN_USER ?? "local-admin",
+  operatorKey: import.meta.env.VITE_OPERATOR_KEY ?? ""
 };
 
 const ADMIN_USER_OVERRIDE_KEY = "ops.adminUserOverride";
@@ -68,6 +70,22 @@ async function http<T>(path: string, init: RequestInit = {}, admin = false): Pro
     headers.set("X-Admin-Key", config.adminKey);
     headers.set("X-Admin-Role", config.adminRole);
     headers.set("X-Admin-User", getAdminUser());
+  }
+  const res = await fetch(`${config.baseUrl}${path}`, { ...init, headers });
+  if (!res.ok) {
+    throw new Error(`${res.status} ${await res.text()}`);
+  }
+  if (res.status === 204) return {} as T;
+  return (await res.json()) as T;
+}
+
+async function httpOperator<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers ?? {});
+  headers.set("Content-Type", "application/json");
+  if (config.operatorKey) {
+    headers.set("X-Operator-Key", config.operatorKey);
+  } else {
+    headers.set("X-API-Key", config.apiKey);
   }
   const res = await fetch(`${config.baseUrl}${path}`, { ...init, headers });
   if (!res.ok) {
@@ -123,6 +141,41 @@ export const Api = {
       method: "PATCH",
       body: JSON.stringify(payload)
     }, true),
+  approveOpsOperatorApplication: (applicationId: string, payload: { decision_note?: string | null; telegram_chat_id?: string | null }) =>
+    http<{ application: OperatorApplicationRecord; operator: Record<string, unknown>; operator_token: string }>(
+      `/v1/ops/operator-applications/${applicationId}/approve`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload)
+      },
+      true
+    ),
+  notifyOperatorTask: (operatorId: string, payload: { task_id: string; message?: string | null }) =>
+    http(`/v1/ops/operators/${operatorId}/notify-task`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }, true),
+  listOperatorQueue: (params: { status?: string; taskType?: string; onlyManualReview?: boolean; mineOnly?: boolean; limit?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (params.status) q.set("status_filter", params.status);
+    if (params.taskType) q.set("task_type", params.taskType);
+    if (params.onlyManualReview) q.set("only_manual_review", "true");
+    if (params.mineOnly) q.set("mine_only", "true");
+    if (params.limit) q.set("limit", String(params.limit));
+    const suffix = q.toString() ? `?${q.toString()}` : "";
+    return httpOperator<TaskWithReview[]>(`/v1/operator/queue${suffix}`);
+  },
+  getOperatorTask: (taskId: string) => httpOperator<TaskWithReview>(`/v1/operator/tasks/${taskId}`),
+  claimOperatorTask: (taskId: string) => httpOperator<Task>(`/v1/operator/tasks/${taskId}/claim`, { method: "POST" }),
+  completeOperatorTask: (taskId: string, result: Record<string, unknown>, workerNote?: string | null) =>
+    httpOperator<Task>(`/v1/operator/tasks/${taskId}/complete`, {
+      method: "POST",
+      body: JSON.stringify({ result, worker_note: workerNote ?? null })
+    }),
+  uploadOperatorProof: (taskId: string, payload: Record<string, unknown>) =>
+    httpOperator(`/v1/operator/tasks/${taskId}/proof`, { method: "POST", body: JSON.stringify(payload) }),
+  uploadOperatorArtifact: (taskId: string, payload: Record<string, unknown>) =>
+    httpOperator(`/v1/operator/tasks/${taskId}/artifacts/upload`, { method: "POST", body: JSON.stringify(payload) }),
   createTask: (payload: Record<string, unknown>) =>
     http<Task>("/v1/tasks", { method: "POST", body: JSON.stringify(payload) }),
   createJudgment: (payload: Record<string, unknown>) =>

@@ -64,6 +64,7 @@ export type OperatorApplicationRecord = {
   decision_note?: string | null;
   reviewed_by?: string | null;
   reviewed_at?: string | null;
+  operator_id?: string | null;
   source?: string | null;
   page?: string | null;
   metadata?: Record<string, unknown>;

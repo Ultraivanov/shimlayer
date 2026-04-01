@@ -101,6 +101,7 @@ create table if not exists public.operator_applications (
   decision_note text,
   reviewed_by text,
   reviewed_at timestamptz,
+  operator_id uuid,
   source text,
   page text,
   metadata jsonb not null default '{}'::jsonb,
@@ -116,6 +117,30 @@ create index if not exists idx_operator_apps_email
   on public.operator_applications(email);
 create index if not exists idx_operator_apps_telegram
   on public.operator_applications(telegram_handle);
+
+create table if not exists public.operators (
+  id uuid primary key default uuid_generate_v4(),
+  application_id uuid unique references public.operator_applications(id) on delete set null,
+  status text not null default 'active',
+  role text not null default 'operator',
+  region text not null,
+  email text not null,
+  phone text not null,
+  telegram_handle text not null,
+  telegram_chat_id text,
+  access_token text not null unique,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_operators_status
+  on public.operators(status);
+create index if not exists idx_operators_token
+  on public.operators(access_token);
+
+alter table public.operator_applications
+  add constraint operator_applications_operator_id_fkey
+  foreign key (operator_id) references public.operators(id) on delete set null;
 
 alter table public.accounts
 add column if not exists flow_credits integer not null default 0;
@@ -479,6 +504,11 @@ for each row execute function public.set_updated_at();
 drop trigger if exists trg_operator_applications_updated_at on public.operator_applications;
 create trigger trg_operator_applications_updated_at
 before update on public.operator_applications
+for each row execute function public.set_updated_at();
+
+drop trigger if exists trg_operators_updated_at on public.operators;
+create trigger trg_operators_updated_at
+before update on public.operators
 for each row execute function public.set_updated_at();
 
 -- Enable RLS

@@ -35,6 +35,7 @@ from app.models import (
     TaskWithReview,
     TopUpRequest,
     OperatorApplicationRecord,
+    OperatorRecord,
     UpdateOperatorApplicationRequest,
     WebhookJob,
     WebhookDeadLetter,
@@ -73,6 +74,9 @@ class InMemoryRepository:
         self._openai_interruptions: dict[str, OpenAIInterruptionRecord] = {}
         self._leads: list[LeadRecord] = []
         self._operator_applications: dict[UUID, OperatorApplicationRecord] = {}
+        self._operators: dict[UUID, OperatorRecord] = {}
+        self._operator_tokens_by_id: dict[UUID, str] = {}
+        self._operator_ids_by_token: dict[str, UUID] = {}
         self._ops_metrics_history: list[OpsMetricsHistoryPoint] = []
 
     @staticmethod
@@ -301,6 +305,7 @@ class InMemoryRepository:
                 decision_note=None,
                 reviewed_by=None,
                 reviewed_at=None,
+                operator_id=None,
                 source=payload.source,
                 page=payload.page,
                 metadata=payload.metadata or {},
@@ -345,6 +350,83 @@ class InMemoryRepository:
                 updates["telegram_chat_id"] = payload.telegram_chat_id
             updated = record.model_copy(update=updates)
             self._operator_applications[application_id] = updated
+            return updated
+
+    def create_operator_from_application(
+        self,
+        application_id: UUID,
+        reviewer_id: str,
+    ) -> tuple[OperatorRecord, str] | None:
+        with self._lock:
+            application = self._operator_applications.get(application_id)
+            if not application:
+                return None
+            for operator in self._operators.values():
+                if operator.application_id == application_id:
+                    token = self._operator_tokens_by_id.get(operator.id, "")
+                    return operator, token
+            operator_id = uuid4()
+            token = f"op_{uuid4().hex}"
+            operator = OperatorRecord(
+                id=operator_id,
+                application_id=application_id,
+                status="active",
+                role="operator",
+                region=application.region,
+                email=application.email,
+                phone=application.phone,
+                telegram_handle=application.telegram_handle,
+                telegram_chat_id=application.telegram_chat_id,
+                created_at=utcnow(),
+                updated_at=utcnow(),
+            )
+            self._operators[operator_id] = operator
+            self._operator_tokens_by_id[operator_id] = token
+            self._operator_ids_by_token[token] = operator_id
+            self._operator_applications[application_id] = application.model_copy(
+                update={"operator_id": operator_id, "updated_at": utcnow()}
+            )
+            return operator, token
+
+    def get_operator_by_token(self, token: str) -> OperatorRecord | None:
+        with self._lock:
+            operator_id = self._operator_ids_by_token.get(token)
+            if not operator_id:
+                return None
+            return self._operators.get(operator_id)
+
+    def get_operator(self, operator_id: UUID) -> OperatorRecord | None:
+        with self._lock:
+            return self._operators.get(operator_id)
+
+    def get_operator_by_chat_id(self, chat_id: str) -> OperatorRecord | None:
+        with self._lock:
+            for operator in self._operators.values():
+                if operator.telegram_chat_id == chat_id:
+                    return operator
+            return None
+
+    def link_operator_chat_id(self, token: str, chat_id: str) -> OperatorRecord | None:
+        with self._lock:
+            operator_id = self._operator_ids_by_token.get(token)
+            if not operator_id:
+                return None
+            for operator in self._operators.values():
+                if operator.telegram_chat_id == chat_id and operator.id != operator_id:
+                    return None
+            operator = self._operators.get(operator_id)
+            if not operator:
+                return None
+            if operator.telegram_chat_id and operator.telegram_chat_id != chat_id:
+                return None
+            now = utcnow()
+            updated = operator.model_copy(update={"telegram_chat_id": chat_id, "updated_at": now})
+            self._operators[operator_id] = updated
+            application = self._operator_applications.get(operator.application_id)
+            if application and not application.telegram_chat_id:
+                self._operator_applications[operator.application_id] = application.model_copy(
+                    update={"telegram_chat_id": chat_id, "updated_at": now}
+                )
             return updated
 
     def create_task(self, api_key: str, payload: CreateTaskRequest) -> Task:

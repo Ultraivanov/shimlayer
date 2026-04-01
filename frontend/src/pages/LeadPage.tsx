@@ -369,7 +369,6 @@ if stuck or low_confidence:
                   value={operatorRegion}
                   onUpdate={setOperatorRegion}
                   placeholder="Region / timezone"
-                  title="Region"
                   disabled={operatorBusy}
                 />
                 <TextInput
@@ -377,7 +376,6 @@ if stuck or low_confidence:
                   value={operatorEmail}
                   onUpdate={setOperatorEmail}
                   placeholder="Work email"
-                  title="Email"
                   type="email"
                   disabled={operatorBusy}
                 />
@@ -386,7 +384,6 @@ if stuck or low_confidence:
                   value={operatorPhone}
                   onUpdate={setOperatorPhone}
                   placeholder="Phone (WhatsApp/Signal ok)"
-                  title="Phone"
                   disabled={operatorBusy}
                 />
                 <TextInput
@@ -394,7 +391,6 @@ if stuck or low_confidence:
                   value={operatorTelegram}
                   onUpdate={setOperatorTelegram}
                   placeholder="@telegram_handle"
-                  title="Telegram"
                   disabled={operatorBusy}
                 />
                 <TextInput
@@ -402,7 +398,6 @@ if stuck or low_confidence:
                   value={operatorTelegramChatId}
                   onUpdate={setOperatorTelegramChatId}
                   placeholder="Optional chat id (if you already have it)"
-                  title="Telegram chat id (optional)"
                   disabled={operatorBusy}
                 />
                 <TextInput
@@ -410,7 +405,6 @@ if stuck or low_confidence:
                   value={operatorLanguages}
                   onUpdate={setOperatorLanguages}
                   placeholder="Languages (e.g. EN, RU)"
-                  title="Languages"
                   disabled={operatorBusy}
                 />
                 <TextArea
@@ -427,7 +421,6 @@ if stuck or low_confidence:
                   value={operatorWebsite}
                   onUpdate={setOperatorWebsite}
                   placeholder="Website"
-                  title="Website"
                   tabIndex={-1}
                   autoComplete="off"
                 />

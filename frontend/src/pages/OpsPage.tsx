@@ -197,6 +197,10 @@ export function OpsPage() {
   const [operatorNoteDrafts, setOperatorNoteDrafts] = useState<Record<string, string>>({});
   const [operatorChatDrafts, setOperatorChatDrafts] = useState<Record<string, string>>({});
   const [operatorActionId, setOperatorActionId] = useState<string>("");
+  const [operatorTokensById, setOperatorTokensById] = useState<Record<string, string>>({});
+  const [operatorIdsByApplication, setOperatorIdsByApplication] = useState<Record<string, string>>({});
+  const [operatorTaskDrafts, setOperatorTaskDrafts] = useState<Record<string, string>>({});
+  const [operatorNotifyId, setOperatorNotifyId] = useState<string>("");
 
   const [showOnlyProblem, setShowOnlyProblem] = useState<boolean>(() => loadFlag("ops.showOnlyProblem", false));
   const [showSlaBreachQueue, setShowSlaBreachQueue] = useState<boolean>(() => loadFlag("ops.showSlaBreachQueue", false));
@@ -1030,18 +1034,49 @@ export function OpsPage() {
     try {
       const note = operatorNoteDrafts[applicationId]?.trim() || null;
       const chatId = operatorChatDrafts[applicationId]?.trim() || null;
-      const updated = await Api.updateOpsOperatorApplication(applicationId, {
-        status,
-        decision_note: note,
-        telegram_chat_id: chatId
-      });
-      setOperatorApplications((prev) => prev.map((row) => (row.id === applicationId ? updated : row)));
+      if (status === "approved") {
+        const res = await Api.approveOpsOperatorApplication(applicationId, {
+          decision_note: note,
+          telegram_chat_id: chatId
+        });
+        setOperatorApplications((prev) => prev.map((row) => (row.id === applicationId ? res.application : row)));
+        setOperatorTokensById((prev) => ({ ...prev, [applicationId]: res.operator_token }));
+        const operatorId = typeof (res as any)?.operator?.id === "string" ? String((res as any).operator.id) : "";
+        if (operatorId) {
+          setOperatorIdsByApplication((prev) => ({ ...prev, [applicationId]: operatorId }));
+        }
+      } else {
+        const updated = await Api.updateOpsOperatorApplication(applicationId, {
+          status,
+          decision_note: note,
+          telegram_chat_id: chatId
+        });
+        setOperatorApplications((prev) => prev.map((row) => (row.id === applicationId ? updated : row)));
+      }
       pushToast("success", `Application ${status}`);
     } catch (e) {
       pushToast("error", `Application update failed: ${String(e)}`);
       setOperatorApplicationsError(String(e));
     } finally {
       setOperatorActionId("");
+    }
+  }
+
+  async function notifyOperatorTask(applicationId: string, operatorId: string) {
+    if (!canManageOperators) return;
+    const taskId = (operatorTaskDrafts[applicationId] || "").trim();
+    if (!taskId) {
+      pushToast("error", "Add a task_id to notify.");
+      return;
+    }
+    setOperatorNotifyId(applicationId);
+    try {
+      await Api.notifyOperatorTask(operatorId, { task_id: taskId });
+      pushToast("success", "Task sent to operator");
+    } catch (e) {
+      pushToast("error", `Notify failed: ${String(e)}`);
+    } finally {
+      setOperatorNotifyId("");
     }
   }
 
@@ -1156,6 +1191,20 @@ export function OpsPage() {
     if (activeView !== "operators") return;
     void loadOperatorApplications();
   }, [activeView, operatorStatusFilter, canManageOperators]);
+
+  useEffect(() => {
+    if (operatorApplications.length === 0) return;
+    setOperatorIdsByApplication((prev) => {
+      const next = { ...prev };
+      for (const app of operatorApplications) {
+        const operatorId = (app as any)?.operator_id;
+        if (typeof operatorId === "string" && operatorId) {
+          next[app.id] = operatorId;
+        }
+      }
+      return next;
+    });
+  }, [operatorApplications]);
 
   useEffect(() => {
     if (!showManualReviewQueue) return;
@@ -3432,15 +3481,15 @@ export function OpsPage() {
         </div>
         {!canManageOperators ? <p className="muted">Your role cannot review operator applications.</p> : null}
         <p className="muted">
-          Telegram setup: create a bot via BotFather and share onboarding instructions after approval. Collect chat IDs from operators so we can send tasks.
+          Telegram setup: create a bot via BotFather and share onboarding instructions after approval. Operators can link their chat with the token.
         </p>
         <div className="detail-block">
           <p className="muted" style={{ marginTop: 0 }}>BotFather quick guide</p>
-          <ol className="lead-list">
+          <ol className="list">
             <li>Open @BotFather → /newbot → choose name + username → copy token.</li>
-            <li>Operator messages the bot once (any text) so Telegram creates a chat.</li>
-            <li>Open <span className="mono">https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</span> and find the chat_id.</li>
-            <li>Paste chat_id into the application and click Approve.</li>
+            <li>After approval, share the operator token with the applicant.</li>
+            <li>Operator opens the bot and sends <span className="mono">/link &lt;token&gt;</span> to connect their chat.</li>
+            <li>If needed, you can still paste chat_id manually and approve.</li>
           </ol>
         </div>
         <div className="list">
@@ -3454,6 +3503,8 @@ export function OpsPage() {
           {operatorApplications.map((app) => {
             const noteValue = operatorNoteDrafts[app.id] ?? app.decision_note ?? "";
             const chatValue = operatorChatDrafts[app.id] ?? app.telegram_chat_id ?? "";
+            const tokenValue = operatorTokensById[app.id];
+            const operatorId = operatorIdsByApplication[app.id];
             return (
               <article key={app.id} className="dlq-item" data-testid="ops-operator-application" data-application-id={app.id}>
                 <div className="dlq-head">
@@ -3488,6 +3539,34 @@ export function OpsPage() {
                   <p className="muted">
                     reviewed by {app.reviewed_by} {app.reviewed_at ? `· ${new Date(app.reviewed_at).toLocaleString()}` : ""}
                   </p>
+                ) : null}
+                {tokenValue ? (
+                  <div className="row-tight">
+                    <span className="mono">operator token: {tokenValue}</span>
+                    <Button size="s" view="flat" onClick={() => void copyText(tokenValue)}>Copy</Button>
+                    <span className="muted">Ask operator to send /link &lt;token&gt; to the bot.</span>
+                  </div>
+                ) : null}
+                {app.status === "approved" && operatorId ? (
+                  <div className="row-tight">
+                    <span className="mono">operator id: {operatorId}</span>
+                    <TextInput
+                      size="s"
+                      value={operatorTaskDrafts[app.id] ?? ""}
+                      onUpdate={(value) => setOperatorTaskDrafts((prev) => ({ ...prev, [app.id]: value }))}
+                      placeholder="task_id to send"
+                      disabled={!canManageOperators}
+                    />
+                    <Button
+                      size="s"
+                      view="outlined"
+                      onClick={() => void notifyOperatorTask(app.id, operatorId)}
+                      loading={operatorNotifyId === app.id}
+                      disabled={!canManageOperators || operatorNotifyId === app.id}
+                    >
+                      Send task
+                    </Button>
+                  </div>
                 ) : null}
                 {app.status === "pending" ? (
                   <div className="row-tight">

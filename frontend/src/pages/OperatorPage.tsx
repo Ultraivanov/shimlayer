@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Card, Select, TextArea, TextInput } from "@gravity-ui/uikit";
 
-import { Api } from "../api";
+import { Api, config } from "../api";
 import type { OpenAIInterruptionRecord, OpenAIResumeResponse, Task, TaskWithReview } from "../types";
 import { ArtifactTile } from "../components/ArtifactTile";
 
@@ -81,6 +81,7 @@ export function OperatorPage() {
   const TASK_STATUSES = ["any", "pending", "queued", "claimed", "completed", "failed", "disputed", "refunded"] as const;
   const TASK_TYPES = ["any", "stuck_recovery", "quick_judgment"] as const;
   const PROOF_ARTIFACT_TYPES = ["logs", "screenshot", "recording", "other"] as const;
+  const operatorMode = Boolean(config.operatorKey);
 
   const filteredTasks = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -124,11 +125,15 @@ export function OperatorPage() {
     if (refreshInFlightRef.current) return { ok: false, error: "refresh already in progress" };
     refreshInFlightRef.current = true;
     try {
-      const list = await Api.listMyTasks({ limit: 100 });
+      const list = operatorMode
+        ? await Api.listOperatorQueue({ limit: 100 })
+        : await Api.listMyTasks({ limit: 100 });
       setTasks(list);
       if (selectedTaskId) {
         try {
-          const detail = await Api.getTask(selectedTaskId);
+          const detail = operatorMode
+            ? await Api.getOperatorTask(selectedTaskId)
+            : await Api.getTask(selectedTaskId);
           setSelectedTaskDetail(detail);
         } catch {
           // Ignore detail refresh errors; list refresh is still useful.
@@ -217,7 +222,7 @@ export function OperatorPage() {
     setOpenTaskBusy(true);
     setError(null);
     try {
-      const task = await Api.getTask(id);
+      const task = operatorMode ? await Api.getOperatorTask(id) : await Api.getTask(id);
       setSelectedTaskId(task.id);
       setSelectedTaskDetail(task);
       setTasks((prev) => {
@@ -241,7 +246,7 @@ export function OperatorPage() {
     }
     setError(null);
     try {
-      const task = await Api.getTask(id);
+      const task = operatorMode ? await Api.getOperatorTask(id) : await Api.getTask(id);
       setSelectedTaskId(task.id);
       setSelectedTaskDetail(task);
       setTasks((prev) => {
@@ -388,7 +393,7 @@ export function OperatorPage() {
       return;
     }
     setError(null);
-    void Api.getTask(selectedTaskId)
+    void (operatorMode ? Api.getOperatorTask(selectedTaskId) : Api.getTask(selectedTaskId))
       .then((t) => setSelectedTaskDetail(t))
       .catch((e) => setError(String(e)));
   }, [selectedTaskId]);
@@ -398,7 +403,9 @@ export function OperatorPage() {
     if (isWorking) return;
     setIsWorking(true);
     try {
-      const updated = await Api.claimTask(selectedTask.id);
+      const updated = operatorMode
+        ? await Api.claimOperatorTask(selectedTask.id)
+        : await Api.claimTask(selectedTask.id);
       setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
       setSelectedTaskId(updated.id);
       await refresh();
@@ -420,7 +427,9 @@ export function OperatorPage() {
         selectedTask.task_type === "quick_judgment"
           ? { decision: "yes", note: "Safe to continue." }
           : { action_summary: "Updated selector and resumed flow.", next_step: "Continue automation." };
-      const updated = await Api.completeTask(selectedTask.id, result, null);
+      const updated = operatorMode
+        ? await Api.completeOperatorTask(selectedTask.id, result, null)
+        : await Api.completeTask(selectedTask.id, result, null);
       setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
       await refresh();
       pushToast("success", "Task completed");
@@ -438,13 +447,18 @@ export function OperatorPage() {
     setIsWorking(true);
     try {
       const content = `Operator proof for ${selectedTask.id}\ncreated_at=${new Date().toISOString()}\n`;
-      await Api.uploadArtifact(selectedTask.id, {
+      const payload = {
         artifact_type: "logs",
         content_base64: toBase64Utf8(content),
         filename: `operator-proof-${selectedTask.id.slice(0, 8)}.txt`,
         content_type: "text/plain",
         metadata: { source: "operator-console" }
-      });
+      };
+      if (operatorMode) {
+        await Api.uploadOperatorArtifact(selectedTask.id, payload);
+      } else {
+        await Api.uploadArtifact(selectedTask.id, payload);
+      }
       await refresh();
       pushToast("success", "Local proof uploaded");
     } catch (e) {
@@ -520,12 +534,17 @@ export function OperatorPage() {
     setProofBusy(true);
     setError(null);
     try {
-      await Api.uploadProof(selectedTask.id, {
+      const payload = {
         artifact_type: proofArtifactType,
         storage_path: storage,
         checksum_sha256: checksum || null,
         metadata: meta
-      });
+      };
+      if (operatorMode) {
+        await Api.uploadOperatorProof(selectedTask.id, payload);
+      } else {
+        await Api.uploadProof(selectedTask.id, payload);
+      }
       setProofStoragePath("");
       setProofChecksum("");
       setProofMetadataJson("{}");

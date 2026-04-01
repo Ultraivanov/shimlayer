@@ -41,6 +41,7 @@ from app.models import (
     WebhookDeadLetter,
     WebhookDelivery,
     OperatorApplicationRecord,
+    OperatorRecord,
     UpdateOperatorApplicationRequest,
     new_task,
     utcnow,
@@ -401,7 +402,7 @@ class PostgresRepository:
                     (id, region, email, phone, telegram_handle, telegram_chat_id, experience, languages, status, source, page, metadata)
                     values (%s, %s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s)
                     returning id, region, email, phone, telegram_handle, telegram_chat_id, experience, languages,
-                      status, decision_note, reviewed_by, reviewed_at, source, page, metadata, created_at, updated_at
+                      status, decision_note, reviewed_by, reviewed_at, operator_id, source, page, metadata, created_at, updated_at
                     """,
                     (
                         application_id,
@@ -434,6 +435,7 @@ class PostgresRepository:
             decision_note=row.get("decision_note"),
             reviewed_by=row.get("reviewed_by"),
             reviewed_at=row.get("reviewed_at"),
+            operator_id=row.get("operator_id"),
             source=row.get("source"),
             page=row.get("page"),
             metadata=row.get("metadata") or {},
@@ -453,7 +455,7 @@ class PostgresRepository:
                     cur.execute(
                         """
                         select id, region, email, phone, telegram_handle, telegram_chat_id, experience, languages,
-                          status, decision_note, reviewed_by, reviewed_at, source, page, metadata, created_at, updated_at
+                          status, decision_note, reviewed_by, reviewed_at, operator_id, source, page, metadata, created_at, updated_at
                         from public.operator_applications
                         where status = %s
                         order by created_at desc
@@ -465,7 +467,7 @@ class PostgresRepository:
                     cur.execute(
                         """
                         select id, region, email, phone, telegram_handle, telegram_chat_id, experience, languages,
-                          status, decision_note, reviewed_by, reviewed_at, source, page, metadata, created_at, updated_at
+                          status, decision_note, reviewed_by, reviewed_at, operator_id, source, page, metadata, created_at, updated_at
                         from public.operator_applications
                         order by created_at desc
                         limit %s
@@ -488,6 +490,7 @@ class PostgresRepository:
                 decision_note=row.get("decision_note"),
                 reviewed_by=row.get("reviewed_by"),
                 reviewed_at=row.get("reviewed_at"),
+                operator_id=row.get("operator_id"),
                 source=row.get("source"),
                 page=row.get("page"),
                 metadata=row.get("metadata") or {},
@@ -515,7 +518,7 @@ class PostgresRepository:
                         telegram_chat_id = coalesce(%s, telegram_chat_id)
                     where id = %s
                     returning id, region, email, phone, telegram_handle, telegram_chat_id, experience, languages,
-                      status, decision_note, reviewed_by, reviewed_at, source, page, metadata, created_at, updated_at
+                      status, decision_note, reviewed_by, reviewed_at, operator_id, source, page, metadata, created_at, updated_at
                     """,
                     (
                         payload.status,
@@ -542,9 +545,266 @@ class PostgresRepository:
             decision_note=row.get("decision_note"),
             reviewed_by=row.get("reviewed_by"),
             reviewed_at=row.get("reviewed_at"),
+            operator_id=row.get("operator_id"),
             source=row.get("source"),
             page=row.get("page"),
             metadata=row.get("metadata") or {},
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    def create_operator_from_application(
+        self,
+        application_id: UUID,
+        reviewer_id: str,
+    ) -> tuple[OperatorRecord, str] | None:
+        token = f"op_{uuid4().hex}"
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    select id, region, email, phone, telegram_handle, telegram_chat_id
+                    from public.operator_applications
+                    where id = %s
+                    """,
+                    (application_id,),
+                )
+                app = cur.fetchone()
+                if not app:
+                    conn.rollback()
+                    return None
+                cur.execute(
+                    """
+                    select id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id,
+                      access_token, created_at, updated_at
+                    from public.operators
+                    where application_id = %s
+                    """,
+                    (application_id,),
+                )
+                existing = cur.fetchone()
+                if existing:
+                    operator = OperatorRecord(
+                        id=existing["id"],
+                        application_id=existing["application_id"],
+                        status=existing["status"],
+                        role=existing["role"],
+                        region=existing["region"],
+                        email=existing["email"],
+                        phone=existing["phone"],
+                        telegram_handle=existing["telegram_handle"],
+                        telegram_chat_id=existing.get("telegram_chat_id"),
+                        created_at=existing["created_at"],
+                        updated_at=existing["updated_at"],
+                    )
+                    cur.execute(
+                        """
+                        update public.operator_applications
+                        set operator_id = %s
+                        where id = %s and operator_id is null
+                        """,
+                        (existing["id"], application_id),
+                    )
+                    conn.commit()
+                    return operator, existing["access_token"]
+                operator_id = uuid4()
+                cur.execute(
+                    """
+                    insert into public.operators
+                    (id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id, access_token)
+                    values (%s, %s, 'active', 'operator', %s, %s, %s, %s, %s, %s)
+                    returning id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id,
+                      access_token, created_at, updated_at
+                    """,
+                    (
+                        operator_id,
+                        application_id,
+                        app["region"],
+                        app["email"],
+                        app["phone"],
+                        app["telegram_handle"],
+                        app.get("telegram_chat_id"),
+                        token,
+                    ),
+                )
+                row = cur.fetchone()
+                if row:
+                    cur.execute(
+                        """
+                        update public.operator_applications
+                        set operator_id = %s
+                        where id = %s
+                        """,
+                        (row["id"], application_id),
+                    )
+            conn.commit()
+        if not row:
+            return None
+        operator = OperatorRecord(
+            id=row["id"],
+            application_id=row["application_id"],
+            status=row["status"],
+            role=row["role"],
+            region=row["region"],
+            email=row["email"],
+            phone=row["phone"],
+            telegram_handle=row["telegram_handle"],
+            telegram_chat_id=row.get("telegram_chat_id"),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+        return operator, row["access_token"]
+
+    def get_operator_by_token(self, token: str) -> OperatorRecord | None:
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    select id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id, created_at, updated_at
+                    from public.operators
+                    where access_token = %s
+                    """,
+                    (token,),
+                )
+                row = cur.fetchone()
+            conn.commit()
+        if not row:
+            return None
+        return OperatorRecord(
+            id=row["id"],
+            application_id=row["application_id"],
+            status=row["status"],
+            role=row["role"],
+            region=row["region"],
+            email=row["email"],
+            phone=row["phone"],
+            telegram_handle=row["telegram_handle"],
+            telegram_chat_id=row.get("telegram_chat_id"),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    def get_operator(self, operator_id: UUID) -> OperatorRecord | None:
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    select id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id, created_at, updated_at
+                    from public.operators
+                    where id = %s
+                    """,
+                    (operator_id,),
+                )
+                row = cur.fetchone()
+            conn.commit()
+        if not row:
+            return None
+        return OperatorRecord(
+            id=row["id"],
+            application_id=row["application_id"],
+            status=row["status"],
+            role=row["role"],
+            region=row["region"],
+            email=row["email"],
+            phone=row["phone"],
+            telegram_handle=row["telegram_handle"],
+            telegram_chat_id=row.get("telegram_chat_id"),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    def get_operator_by_chat_id(self, chat_id: str) -> OperatorRecord | None:
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    select id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id, created_at, updated_at
+                    from public.operators
+                    where telegram_chat_id = %s
+                    """,
+                    (chat_id,),
+                )
+                row = cur.fetchone()
+            conn.commit()
+        if not row:
+            return None
+        return OperatorRecord(
+            id=row["id"],
+            application_id=row["application_id"],
+            status=row["status"],
+            role=row["role"],
+            region=row["region"],
+            email=row["email"],
+            phone=row["phone"],
+            telegram_handle=row["telegram_handle"],
+            telegram_chat_id=row.get("telegram_chat_id"),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    def link_operator_chat_id(self, token: str, chat_id: str) -> OperatorRecord | None:
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    select id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id
+                    from public.operators
+                    where access_token = %s
+                    """,
+                    (token,),
+                )
+                operator = cur.fetchone()
+                if not operator:
+                    conn.rollback()
+                    return None
+                cur.execute(
+                    """
+                    select id
+                    from public.operators
+                    where telegram_chat_id = %s
+                    """,
+                    (chat_id,),
+                )
+                existing = cur.fetchone()
+                if existing and existing["id"] != operator["id"]:
+                    conn.rollback()
+                    return None
+                if operator.get("telegram_chat_id") and operator.get("telegram_chat_id") != chat_id:
+                    conn.rollback()
+                    return None
+                cur.execute(
+                    """
+                    update public.operators
+                    set telegram_chat_id = %s, updated_at = now()
+                    where id = %s
+                    returning id, application_id, status, role, region, email, phone, telegram_handle,
+                      telegram_chat_id, created_at, updated_at
+                    """,
+                    (chat_id, operator["id"]),
+                )
+                row = cur.fetchone()
+                if row:
+                    cur.execute(
+                        """
+                        update public.operator_applications
+                        set telegram_chat_id = coalesce(telegram_chat_id, %s), updated_at = now()
+                        where id = %s
+                        """,
+                        (chat_id, row["application_id"]),
+                    )
+            conn.commit()
+        if not row:
+            return None
+        return OperatorRecord(
+            id=row["id"],
+            application_id=row["application_id"],
+            status=row["status"],
+            role=row["role"],
+            region=row["region"],
+            email=row["email"],
+            phone=row["phone"],
+            telegram_handle=row["telegram_handle"],
+            telegram_chat_id=row.get("telegram_chat_id"),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
