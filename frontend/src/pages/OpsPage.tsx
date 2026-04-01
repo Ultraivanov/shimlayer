@@ -205,6 +205,9 @@ export function OpsPage() {
   const [operatorChatById, setOperatorChatById] = useState<Record<string, string>>({});
   const [operatorVerificationById, setOperatorVerificationById] = useState<Record<string, string>>({});
   const [operatorVerificationNoteById, setOperatorVerificationNoteById] = useState<Record<string, string>>({});
+  const [operatorMessageDrafts, setOperatorMessageDrafts] = useState<Record<string, string>>({});
+  const [operatorNotifyStatusById, setOperatorNotifyStatusById] = useState<Record<string, string>>({});
+  const [operatorNotifyAtById, setOperatorNotifyAtById] = useState<Record<string, string>>({});
   const [operatorManageId, setOperatorManageId] = useState<string>("");
 
   const [showOnlyProblem, setShowOnlyProblem] = useState<boolean>(() => loadFlag("ops.showOnlyProblem", false));
@@ -1075,11 +1078,16 @@ export function OpsPage() {
       return;
     }
     setOperatorNotifyId(applicationId);
+    setOperatorNotifyStatusById((prev) => ({ ...prev, [applicationId]: "sending" }));
     try {
-      await Api.notifyOperatorTask(operatorId, { task_id: taskId });
+      const message = (operatorMessageDrafts[applicationId] || "").trim() || null;
+      await Api.notifyOperatorTask(operatorId, { task_id: taskId, message });
       pushToast("success", "Task sent to operator");
+      setOperatorNotifyStatusById((prev) => ({ ...prev, [applicationId]: "sent" }));
+      setOperatorNotifyAtById((prev) => ({ ...prev, [applicationId]: new Date().toISOString() }));
     } catch (e) {
       pushToast("error", `Notify failed: ${String(e)}`);
+      setOperatorNotifyStatusById((prev) => ({ ...prev, [applicationId]: "failed" }));
     } finally {
       setOperatorNotifyId("");
     }
@@ -3675,6 +3683,13 @@ export function OpsPage() {
                       placeholder="task_id to send"
                       disabled={!canManageOperators}
                     />
+                    <TextInput
+                      size="s"
+                      value={operatorMessageDrafts[app.id] ?? ""}
+                      onUpdate={(value) => setOperatorMessageDrafts((prev) => ({ ...prev, [app.id]: value }))}
+                      placeholder="message (optional)"
+                      disabled={!canManageOperators}
+                    />
                     <Button
                       size="s"
                       view="outlined"
@@ -3684,6 +3699,38 @@ export function OpsPage() {
                     >
                       Send task
                     </Button>
+                    <Button
+                      size="s"
+                      view="flat"
+                      onClick={() =>
+                        setOperatorMessageDrafts((prev) => ({
+                          ...prev,
+                          [app.id]: `Please claim task ${operatorTaskDrafts[app.id] ?? ""} and confirm in UI.`
+                        }))
+                      }
+                      disabled={!canManageOperators}
+                    >
+                      Template: claim
+                    </Button>
+                    <Button
+                      size="s"
+                      view="flat"
+                      onClick={() =>
+                        setOperatorMessageDrafts((prev) => ({
+                          ...prev,
+                          [app.id]: `High priority task ${operatorTaskDrafts[app.id] ?? ""} — please take ASAP.`
+                        }))
+                      }
+                      disabled={!canManageOperators}
+                    >
+                      Template: urgent
+                    </Button>
+                    {operatorNotifyStatusById[app.id] ? (
+                      <span className="muted">
+                        notify: {operatorNotifyStatusById[app.id]}
+                        {operatorNotifyAtById[app.id] ? ` · ${new Date(operatorNotifyAtById[app.id]).toLocaleString()}` : ""}
+                      </span>
+                    ) : null}
                     <Button
                       size="s"
                       view="outlined"
