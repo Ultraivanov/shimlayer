@@ -187,6 +187,10 @@ class OperatorRecord(BaseModel):
     phone: str
     telegram_handle: str
     telegram_chat_id: str | None = None
+    verification_status: str = "pending"
+    verification_note: str | None = None
+    verified_by: str | None = None
+    verified_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -204,6 +208,11 @@ class UpdateOperatorStatusRequest(BaseModel):
 class OperatorTokenRotateResponse(BaseModel):
     operator: OperatorRecord
     operator_token: str
+
+
+class UpdateOperatorVerificationRequest(BaseModel):
+    verification_status: str = Field(pattern="^(pending|verified|rejected)$")
+    verification_note: str | None = Field(default=None, max_length=2000)
 
 
 class Artifact(BaseModel):

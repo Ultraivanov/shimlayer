@@ -67,6 +67,7 @@ from app.models import (
     UpdateOpsIncidentRequest,
     UpdateOperatorApplicationRequest,
     UpdateOperatorStatusRequest,
+    UpdateOperatorVerificationRequest,
     WebhookDeadLetter,
     WebhookDelivery,
     LedgerEntry,
@@ -461,6 +462,8 @@ def require_operator_key(
     operator = repo.get_operator_by_token(x_operator_key)
     if not operator or operator.status != "active":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid operator key")
+    if operator.verification_status != "verified":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operator not verified")
     return operator
 
 
@@ -1685,6 +1688,29 @@ def unlink_operator_chat(
     if admin_ctx.role not in ("ops_manager", "admin"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role for operator onboarding")
     operator = repo.unlink_operator_chat(operator_id)
+    if not operator:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Operator not found")
+    return operator
+
+
+@router.post("/ops/operators/{operator_id}/verification", response_model=OperatorRecord)
+def update_operator_verification(
+    operator_id: UUID,
+    payload: UpdateOperatorVerificationRequest,
+    api_key: str = Depends(require_api_key),
+    admin_key: str = Depends(require_admin_key),
+    admin_ctx: AdminContext = Depends(require_admin_context),
+    repo: Repository = Depends(get_repo),
+) -> OperatorRecord:
+    _ = (api_key, admin_key, admin_ctx)
+    if admin_ctx.role not in ("ops_manager", "admin"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role for operator onboarding")
+    operator = repo.update_operator_verification(
+        operator_id,
+        status=payload.verification_status,
+        note=payload.verification_note,
+        reviewer_id=admin_ctx.user_id,
+    )
     if not operator:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Operator not found")
     return operator

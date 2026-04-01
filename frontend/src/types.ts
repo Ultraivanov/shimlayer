@@ -76,6 +76,10 @@ export type OperatorRecord = {
   id: string;
   application_id: string;
   status: string;
+  verification_status?: string;
+  verification_note?: string | null;
+  verified_by?: string | null;
+  verified_at?: string | null;
   role: string;
   region: string;
   email: string;

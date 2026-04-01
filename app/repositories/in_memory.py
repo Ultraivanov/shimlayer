@@ -465,6 +465,30 @@ class InMemoryRepository:
             self._operators[operator_id] = updated
             return updated
 
+    def update_operator_verification(
+        self,
+        operator_id: UUID,
+        status: str,
+        note: str | None,
+        reviewer_id: str,
+    ) -> OperatorRecord | None:
+        with self._lock:
+            operator = self._operators.get(operator_id)
+            if not operator:
+                return None
+            now = utcnow()
+            updated = operator.model_copy(
+                update={
+                    "verification_status": status,
+                    "verification_note": note,
+                    "verified_by": reviewer_id,
+                    "verified_at": now,
+                    "updated_at": now,
+                }
+            )
+            self._operators[operator_id] = updated
+            return updated
+
     def create_task(self, api_key: str, payload: CreateTaskRequest) -> Task:
         with self._lock:
             account_id, _, flow_credits = self.get_or_create_account(api_key)

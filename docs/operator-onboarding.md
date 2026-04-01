@@ -8,6 +8,7 @@
 - Approve in Ops UI (role: `ops_manager` or `admin`).
 - Approval creates an operator record + access token.
 - Share the token with the operator out-of-band.
+- Operator cannot work tasks until verification is set to `verified`.
 
 ### 3) Telegram linking (for task notifications)
 - Operator opens the bot and sends: `/link <token>`.
@@ -27,3 +28,4 @@
 - If a chat is already linked, `/link` will reject to prevent hijacking.
 - Chat IDs can still be set manually in the Ops UI before approval.
 - Ops can rotate tokens, disable operators, or unlink chats from the Ops UI.
+- Ops can mark verification as `verified` or `rejected` (with notes).

@@ -161,6 +161,12 @@ export const Api = {
       { method: "POST", body: JSON.stringify({ status }) },
       true
     ),
+  updateOpsOperatorVerification: (operatorId: string, payload: { verification_status: "pending" | "verified" | "rejected"; verification_note?: string | null }) =>
+    http<OperatorRecord>(
+      `/v1/ops/operators/${operatorId}/verification`,
+      { method: "POST", body: JSON.stringify(payload) },
+      true
+    ),
   unlinkOpsOperatorChat: (operatorId: string) =>
     http<OperatorRecord>(`/v1/ops/operators/${operatorId}/unlink-chat`, { method: "POST" }, true),
   notifyOperatorTask: (operatorId: string, payload: { task_id: string; message?: string | null }) =>

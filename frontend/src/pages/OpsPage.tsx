@@ -203,6 +203,8 @@ export function OpsPage() {
   const [operatorNotifyId, setOperatorNotifyId] = useState<string>("");
   const [operatorStatusById, setOperatorStatusById] = useState<Record<string, string>>({});
   const [operatorChatById, setOperatorChatById] = useState<Record<string, string>>({});
+  const [operatorVerificationById, setOperatorVerificationById] = useState<Record<string, string>>({});
+  const [operatorVerificationNoteById, setOperatorVerificationNoteById] = useState<Record<string, string>>({});
   const [operatorManageId, setOperatorManageId] = useState<string>("");
 
   const [showOnlyProblem, setShowOnlyProblem] = useState<boolean>(() => loadFlag("ops.showOnlyProblem", false));
@@ -1088,6 +1090,10 @@ export function OpsPage() {
     try {
       const operator = await Api.getOpsOperator(operatorId);
       setOperatorStatusById((prev) => ({ ...prev, [operatorId]: operator.status }));
+      setOperatorVerificationById((prev) => ({ ...prev, [operatorId]: operator.verification_status ?? "pending" }));
+      if (operator.verification_note) {
+        setOperatorVerificationNoteById((prev) => ({ ...prev, [operatorId]: operator.verification_note as string }));
+      }
       if (operator.telegram_chat_id) {
         setOperatorChatById((prev) => ({ ...prev, [operatorId]: operator.telegram_chat_id as string }));
       } else {
@@ -1145,6 +1151,27 @@ export function OpsPage() {
       pushToast("success", "Operator chat unlinked");
     } catch (e) {
       pushToast("error", `Unlink failed: ${String(e)}`);
+    } finally {
+      setOperatorManageId("");
+    }
+  }
+
+  async function updateOperatorVerification(operatorId: string, status: "pending" | "verified" | "rejected") {
+    if (!canManageOperators) return;
+    setOperatorManageId(operatorId);
+    try {
+      const note = (operatorVerificationNoteById[operatorId] || "").trim() || null;
+      const operator = await Api.updateOpsOperatorVerification(operatorId, {
+        verification_status: status,
+        verification_note: note
+      });
+      setOperatorVerificationById((prev) => ({ ...prev, [operatorId]: operator.verification_status ?? status }));
+      if (operator.verification_note) {
+        setOperatorVerificationNoteById((prev) => ({ ...prev, [operatorId]: operator.verification_note as string }));
+      }
+      pushToast("success", `Verification ${operator.verification_status ?? status}`);
+    } catch (e) {
+      pushToast("error", `Verification update failed: ${String(e)}`);
     } finally {
       setOperatorManageId("");
     }
@@ -3632,7 +3659,15 @@ export function OpsPage() {
                   <div className="row-tight">
                     <span className="mono">operator id: {operatorId}</span>
                     <span className="muted">status: {operatorStatusById[operatorId] ?? "unknown"}</span>
+                    <span className="muted">verification: {operatorVerificationById[operatorId] ?? "pending"}</span>
                     {operatorChatById[operatorId] ? <span className="muted">chat: linked</span> : <span className="muted">chat: none</span>}
+                    <TextInput
+                      size="s"
+                      value={operatorVerificationNoteById[operatorId] ?? ""}
+                      onUpdate={(value) => setOperatorVerificationNoteById((prev) => ({ ...prev, [operatorId]: value }))}
+                      placeholder="verification note"
+                      disabled={!canManageOperators}
+                    />
                     <TextInput
                       size="s"
                       value={operatorTaskDrafts[app.id] ?? ""}
@@ -3668,6 +3703,24 @@ export function OpsPage() {
                       disabled={!canManageOperators || operatorManageId === operatorId}
                     >
                       {operatorStatusById[operatorId] === "disabled" ? "Enable" : "Disable"}
+                    </Button>
+                    <Button
+                      size="s"
+                      view="outlined"
+                      onClick={() => void updateOperatorVerification(operatorId, "verified")}
+                      loading={operatorManageId === operatorId}
+                      disabled={!canManageOperators || operatorManageId === operatorId}
+                    >
+                      Verify
+                    </Button>
+                    <Button
+                      size="s"
+                      view="outlined"
+                      onClick={() => void updateOperatorVerification(operatorId, "rejected")}
+                      loading={operatorManageId === operatorId}
+                      disabled={!canManageOperators || operatorManageId === operatorId}
+                    >
+                      Reject
                     </Button>
                     <Button
                       size="s"

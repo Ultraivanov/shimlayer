@@ -576,6 +576,7 @@ class PostgresRepository:
                 cur.execute(
                     """
                     select id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id,
+                      verification_status, verification_note, verified_by, verified_at,
                       access_token, created_at, updated_at
                     from public.operators
                     where application_id = %s
@@ -594,6 +595,10 @@ class PostgresRepository:
                         phone=existing["phone"],
                         telegram_handle=existing["telegram_handle"],
                         telegram_chat_id=existing.get("telegram_chat_id"),
+                        verification_status=existing.get("verification_status") or "pending",
+                        verification_note=existing.get("verification_note"),
+                        verified_by=existing.get("verified_by"),
+                        verified_at=existing.get("verified_at"),
                         created_at=existing["created_at"],
                         updated_at=existing["updated_at"],
                     )
@@ -611,9 +616,11 @@ class PostgresRepository:
                 cur.execute(
                     """
                     insert into public.operators
-                    (id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id, access_token)
-                    values (%s, %s, 'active', 'operator', %s, %s, %s, %s, %s, %s)
+                    (id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id,
+                      verification_status, access_token)
+                    values (%s, %s, 'active', 'operator', %s, %s, %s, %s, %s, 'pending', %s)
                     returning id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id,
+                      verification_status, verification_note, verified_by, verified_at,
                       access_token, created_at, updated_at
                     """,
                     (
@@ -650,6 +657,10 @@ class PostgresRepository:
             phone=row["phone"],
             telegram_handle=row["telegram_handle"],
             telegram_chat_id=row.get("telegram_chat_id"),
+            verification_status=row.get("verification_status") or "pending",
+            verification_note=row.get("verification_note"),
+            verified_by=row.get("verified_by"),
+            verified_at=row.get("verified_at"),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
@@ -660,7 +671,8 @@ class PostgresRepository:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    select id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id, created_at, updated_at
+                    select id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id,
+                      verification_status, verification_note, verified_by, verified_at, created_at, updated_at
                     from public.operators
                     where access_token = %s
                     """,
@@ -680,6 +692,10 @@ class PostgresRepository:
             phone=row["phone"],
             telegram_handle=row["telegram_handle"],
             telegram_chat_id=row.get("telegram_chat_id"),
+            verification_status=row.get("verification_status") or "pending",
+            verification_note=row.get("verification_note"),
+            verified_by=row.get("verified_by"),
+            verified_at=row.get("verified_at"),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
@@ -689,7 +705,8 @@ class PostgresRepository:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    select id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id, created_at, updated_at
+                    select id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id,
+                      verification_status, verification_note, verified_by, verified_at, created_at, updated_at
                     from public.operators
                     where id = %s
                     """,
@@ -709,6 +726,10 @@ class PostgresRepository:
             phone=row["phone"],
             telegram_handle=row["telegram_handle"],
             telegram_chat_id=row.get("telegram_chat_id"),
+            verification_status=row.get("verification_status") or "pending",
+            verification_note=row.get("verification_note"),
+            verified_by=row.get("verified_by"),
+            verified_at=row.get("verified_at"),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
@@ -718,7 +739,8 @@ class PostgresRepository:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    select id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id, created_at, updated_at
+                    select id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id,
+                      verification_status, verification_note, verified_by, verified_at, created_at, updated_at
                     from public.operators
                     where telegram_chat_id = %s
                     """,
@@ -738,6 +760,10 @@ class PostgresRepository:
             phone=row["phone"],
             telegram_handle=row["telegram_handle"],
             telegram_chat_id=row.get("telegram_chat_id"),
+            verification_status=row.get("verification_status") or "pending",
+            verification_note=row.get("verification_note"),
+            verified_by=row.get("verified_by"),
+            verified_at=row.get("verified_at"),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
@@ -747,7 +773,8 @@ class PostgresRepository:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    select id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id
+                    select id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id,
+                      verification_status
                     from public.operators
                     where access_token = %s
                     """,
@@ -758,6 +785,9 @@ class PostgresRepository:
                     conn.rollback()
                     return None
                 if operator.get("status") != "active":
+                    conn.rollback()
+                    return None
+                if operator.get("verification_status") != "verified":
                     conn.rollback()
                     return None
                 cur.execute(
@@ -781,7 +811,7 @@ class PostgresRepository:
                     set telegram_chat_id = %s, updated_at = now()
                     where id = %s
                     returning id, application_id, status, role, region, email, phone, telegram_handle,
-                      telegram_chat_id, created_at, updated_at
+                      telegram_chat_id, verification_status, verification_note, verified_by, verified_at, created_at, updated_at
                     """,
                     (chat_id, operator["id"]),
                 )
@@ -808,6 +838,10 @@ class PostgresRepository:
             phone=row["phone"],
             telegram_handle=row["telegram_handle"],
             telegram_chat_id=row.get("telegram_chat_id"),
+            verification_status=row.get("verification_status") or "pending",
+            verification_note=row.get("verification_note"),
+            verified_by=row.get("verified_by"),
+            verified_at=row.get("verified_at"),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
@@ -822,7 +856,7 @@ class PostgresRepository:
                     set access_token = %s, updated_at = now()
                     where id = %s
                     returning id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id,
-                      created_at, updated_at
+                      verification_status, verification_note, verified_by, verified_at, created_at, updated_at
                     """,
                     (token, operator_id),
                 )
@@ -840,6 +874,10 @@ class PostgresRepository:
             phone=row["phone"],
             telegram_handle=row["telegram_handle"],
             telegram_chat_id=row.get("telegram_chat_id"),
+            verification_status=row.get("verification_status") or "pending",
+            verification_note=row.get("verification_note"),
+            verified_by=row.get("verified_by"),
+            verified_at=row.get("verified_at"),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
@@ -854,7 +892,7 @@ class PostgresRepository:
                     set status = %s, updated_at = now()
                     where id = %s
                     returning id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id,
-                      created_at, updated_at
+                      verification_status, verification_note, verified_by, verified_at, created_at, updated_at
                     """,
                     (status, operator_id),
                 )
@@ -872,6 +910,10 @@ class PostgresRepository:
             phone=row["phone"],
             telegram_handle=row["telegram_handle"],
             telegram_chat_id=row.get("telegram_chat_id"),
+            verification_status=row.get("verification_status") or "pending",
+            verification_note=row.get("verification_note"),
+            verified_by=row.get("verified_by"),
+            verified_at=row.get("verified_at"),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
@@ -885,7 +927,7 @@ class PostgresRepository:
                     set telegram_chat_id = null, updated_at = now()
                     where id = %s
                     returning id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id,
-                      created_at, updated_at
+                      verification_status, verification_note, verified_by, verified_at, created_at, updated_at
                     """,
                     (operator_id,),
                 )
@@ -903,6 +945,55 @@ class PostgresRepository:
             phone=row["phone"],
             telegram_handle=row["telegram_handle"],
             telegram_chat_id=row.get("telegram_chat_id"),
+            verification_status=row.get("verification_status") or "pending",
+            verification_note=row.get("verification_note"),
+            verified_by=row.get("verified_by"),
+            verified_at=row.get("verified_at"),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    def update_operator_verification(
+        self,
+        operator_id: UUID,
+        status: str,
+        note: str | None,
+        reviewer_id: str,
+    ) -> OperatorRecord | None:
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    update public.operators
+                    set verification_status = %s,
+                        verification_note = %s,
+                        verified_by = %s,
+                        verified_at = now(),
+                        updated_at = now()
+                    where id = %s
+                    returning id, application_id, status, role, region, email, phone, telegram_handle, telegram_chat_id,
+                      verification_status, verification_note, verified_by, verified_at, created_at, updated_at
+                    """,
+                    (status, note, reviewer_id, operator_id),
+                )
+                row = cur.fetchone()
+            conn.commit()
+        if not row:
+            return None
+        return OperatorRecord(
+            id=row["id"],
+            application_id=row["application_id"],
+            status=row["status"],
+            role=row["role"],
+            region=row["region"],
+            email=row["email"],
+            phone=row["phone"],
+            telegram_handle=row["telegram_handle"],
+            telegram_chat_id=row.get("telegram_chat_id"),
+            verification_status=row.get("verification_status") or "pending",
+            verification_note=row.get("verification_note"),
+            verified_by=row.get("verified_by"),
+            verified_at=row.get("verified_at"),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )

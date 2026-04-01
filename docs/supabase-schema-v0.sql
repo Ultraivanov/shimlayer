@@ -122,6 +122,10 @@ create table if not exists public.operators (
   id uuid primary key default uuid_generate_v4(),
   application_id uuid unique references public.operator_applications(id) on delete set null,
   status text not null default 'active',
+  verification_status text not null default 'pending',
+  verification_note text,
+  verified_by text,
+  verified_at timestamptz,
   role text not null default 'operator',
   region text not null,
   email text not null,
@@ -137,6 +141,8 @@ create index if not exists idx_operators_status
   on public.operators(status);
 create index if not exists idx_operators_token
   on public.operators(access_token);
+create index if not exists idx_operators_verification
+  on public.operators(verification_status, created_at desc);
 
 alter table public.operator_applications
   add constraint operator_applications_operator_id_fkey
