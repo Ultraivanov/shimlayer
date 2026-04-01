@@ -90,6 +90,17 @@ export type OperatorRecord = {
   updated_at: string;
 };
 
+export type OperatorDeliveryRecord = {
+  id: string;
+  operator_id: string;
+  task_id: string;
+  channel: string;
+  status: string;
+  attempt: number;
+  error?: string | null;
+  created_at: string;
+};
+
 export type BalanceResponse = {
   account_id: string;
   balance_usd: number;

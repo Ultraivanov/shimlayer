@@ -208,6 +208,7 @@ export function OpsPage() {
   const [operatorMessageDrafts, setOperatorMessageDrafts] = useState<Record<string, string>>({});
   const [operatorNotifyStatusById, setOperatorNotifyStatusById] = useState<Record<string, string>>({});
   const [operatorNotifyAtById, setOperatorNotifyAtById] = useState<Record<string, string>>({});
+  const [operatorNotifyErrorById, setOperatorNotifyErrorById] = useState<Record<string, string>>({});
   const [operatorManageId, setOperatorManageId] = useState<string>("");
 
   const [showOnlyProblem, setShowOnlyProblem] = useState<boolean>(() => loadFlag("ops.showOnlyProblem", false));
@@ -1085,9 +1086,11 @@ export function OpsPage() {
       pushToast("success", "Task sent to operator");
       setOperatorNotifyStatusById((prev) => ({ ...prev, [applicationId]: "sent" }));
       setOperatorNotifyAtById((prev) => ({ ...prev, [applicationId]: new Date().toISOString() }));
+      setOperatorNotifyErrorById((prev) => ({ ...prev, [applicationId]: "" }));
     } catch (e) {
       pushToast("error", `Notify failed: ${String(e)}`);
       setOperatorNotifyStatusById((prev) => ({ ...prev, [applicationId]: "failed" }));
+      setOperatorNotifyErrorById((prev) => ({ ...prev, [applicationId]: String(e) }));
     } finally {
       setOperatorNotifyId("");
     }
@@ -1096,7 +1099,10 @@ export function OpsPage() {
   async function loadOperatorDetails(operatorId: string) {
     if (!canManageOperators) return;
     try {
-      const operator = await Api.getOpsOperator(operatorId);
+      const [operator, lastDelivery] = await Promise.all([
+        Api.getOpsOperator(operatorId),
+        Api.getOpsOperatorLastDelivery(operatorId)
+      ]);
       setOperatorStatusById((prev) => ({ ...prev, [operatorId]: operator.status }));
       setOperatorVerificationById((prev) => ({ ...prev, [operatorId]: operator.verification_status ?? "pending" }));
       if (operator.verification_note) {
@@ -1110,6 +1116,13 @@ export function OpsPage() {
           delete next[operatorId];
           return next;
         });
+      }
+      if (lastDelivery) {
+        setOperatorNotifyStatusById((prev) => ({ ...prev, [operator.application_id]: lastDelivery.status }));
+        setOperatorNotifyAtById((prev) => ({ ...prev, [operator.application_id]: lastDelivery.created_at }));
+        if (lastDelivery.error) {
+          setOperatorNotifyErrorById((prev) => ({ ...prev, [operator.application_id]: lastDelivery.error as string }));
+        }
       }
     } catch (e) {
       pushToast("error", `Operator load failed: ${String(e)}`);
@@ -3730,6 +3743,9 @@ export function OpsPage() {
                         notify: {operatorNotifyStatusById[app.id]}
                         {operatorNotifyAtById[app.id] ? ` · ${new Date(operatorNotifyAtById[app.id]).toLocaleString()}` : ""}
                       </span>
+                    ) : null}
+                    {operatorNotifyErrorById[app.id] ? (
+                      <span className="muted">error: {operatorNotifyErrorById[app.id]}</span>
                     ) : null}
                     <Button
                       size="s"

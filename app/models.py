@@ -215,6 +215,22 @@ class UpdateOperatorVerificationRequest(BaseModel):
     verification_note: str | None = Field(default=None, max_length=2000)
 
 
+class OperatorDeliveryRecord(BaseModel):
+    id: UUID
+    operator_id: UUID
+    task_id: UUID
+    channel: str
+    status: str
+    attempt: int
+    error: str | None = None
+    created_at: datetime
+
+
+class OperatorDeliverySummary(BaseModel):
+    operator_id: UUID
+    last_delivery: OperatorDeliveryRecord | None = None
+
+
 class Artifact(BaseModel):
     id: UUID
     task_id: UUID

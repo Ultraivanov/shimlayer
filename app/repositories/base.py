@@ -35,6 +35,7 @@ from app.models import (
     OperatorApplicationRecord,
     OperatorRecord,
     UpdateOperatorApplicationRequest,
+    OperatorDeliveryRecord,
 )
 
 
@@ -98,6 +99,16 @@ class Repository(Protocol):
         note: str | None,
         reviewer_id: str,
     ) -> OperatorRecord | None: ...
+    def record_operator_delivery(
+        self,
+        operator_id: UUID,
+        task_id: UUID,
+        channel: str,
+        status: str,
+        attempt: int,
+        error: str | None = None,
+    ) -> None: ...
+    def get_operator_last_delivery(self, operator_id: UUID) -> OperatorDeliveryRecord | None: ...
 
     def create_task(self, api_key: str, payload: CreateTaskRequest) -> Task: ...
     def list_account_tasks_with_review(

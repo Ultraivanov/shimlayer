@@ -23,7 +23,8 @@ import type {
   LeadRecord,
   OperatorApplicationCreateRequest,
   OperatorApplicationRecord,
-  OperatorRecord
+  OperatorRecord,
+  OperatorDeliveryRecord
 } from "./types";
 
 type Config = {
@@ -167,6 +168,8 @@ export const Api = {
       { method: "POST", body: JSON.stringify(payload) },
       true
     ),
+  getOpsOperatorLastDelivery: (operatorId: string) =>
+    http<OperatorDeliveryRecord | null>(`/v1/ops/operators/${operatorId}/deliveries/last`, {}, true),
   unlinkOpsOperatorChat: (operatorId: string) =>
     http<OperatorRecord>(`/v1/ops/operators/${operatorId}/unlink-chat`, { method: "POST" }, true),
   notifyOperatorTask: (operatorId: string, payload: { task_id: string; message?: string | null }) =>

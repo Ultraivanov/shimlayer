@@ -43,6 +43,7 @@ from app.models import (
     OperatorApplicationRecord,
     OperatorRecord,
     UpdateOperatorApplicationRequest,
+    OperatorDeliveryRecord,
     new_task,
     utcnow,
 )
@@ -1015,6 +1016,55 @@ class PostgresRepository:
             verified_at=row.get("verified_at"),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
+        )
+
+    def record_operator_delivery(
+        self,
+        operator_id: UUID,
+        task_id: UUID,
+        channel: str,
+        status: str,
+        attempt: int,
+        error: str | None = None,
+    ) -> None:
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    insert into public.operator_deliveries
+                    (id, operator_id, task_id, channel, status, attempt, error, created_at)
+                    values (%s, %s, %s, %s, %s, %s, %s, now())
+                    """,
+                    (uuid4(), operator_id, task_id, channel, status, attempt, error),
+                )
+            conn.commit()
+
+    def get_operator_last_delivery(self, operator_id: UUID) -> OperatorDeliveryRecord | None:
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    select id, operator_id, task_id, channel, status, attempt, error, created_at
+                    from public.operator_deliveries
+                    where operator_id = %s
+                    order by created_at desc
+                    limit 1
+                    """,
+                    (operator_id,),
+                )
+                row = cur.fetchone()
+            conn.commit()
+        if not row:
+            return None
+        return OperatorDeliveryRecord(
+            id=row["id"],
+            operator_id=row["operator_id"],
+            task_id=row["task_id"],
+            channel=row["channel"],
+            status=row["status"],
+            attempt=int(row["attempt"]),
+            error=row.get("error"),
+            created_at=row["created_at"],
         )
 
     def create_task(self, api_key: str, payload: CreateTaskRequest) -> Task:

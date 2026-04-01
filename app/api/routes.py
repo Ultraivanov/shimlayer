@@ -54,6 +54,8 @@ from app.models import (
     LeadRecord,
     OperatorApplicationRecord,
     OperatorApprovalResponse,
+    OperatorDeliveryRecord,
+    OperatorDeliverySummary,
     OperatorRecord,
     OperatorTokenRotateResponse,
     PackagePurchaseRequest,
@@ -1802,7 +1804,32 @@ def notify_operator_task(
         ]
     }
     sent = send_telegram_message(operator.telegram_chat_id, text, reply_markup=reply_markup)
-    return {"sent": sent}
+    status = "sent" if sent else "failed"
+    repo.record_operator_delivery(
+        operator_id=operator_id,
+        task_id=payload.task_id,
+        channel="telegram",
+        status=status,
+        attempt=1,
+        error=None if sent else "telegram_failed",
+    )
+    if not sent:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Telegram delivery failed")
+    return {"sent": True}
+
+
+@router.get("/ops/operators/{operator_id}/deliveries/last", response_model=OperatorDeliveryRecord | None)
+def get_operator_last_delivery(
+    operator_id: UUID,
+    api_key: str = Depends(require_api_key),
+    admin_key: str = Depends(require_admin_key),
+    admin_ctx: AdminContext = Depends(require_admin_context),
+    repo: Repository = Depends(get_repo),
+) -> OperatorDeliveryRecord | None:
+    _ = (api_key, admin_key, admin_ctx)
+    if admin_ctx.role not in ("ops_manager", "admin"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role for operator onboarding")
+    return repo.get_operator_last_delivery(operator_id)
 
 
 @router.post("/ops/incidents", response_model=OpsIncident, status_code=status.HTTP_201_CREATED)

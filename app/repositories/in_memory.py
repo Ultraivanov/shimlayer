@@ -37,6 +37,7 @@ from app.models import (
     OperatorApplicationRecord,
     OperatorRecord,
     UpdateOperatorApplicationRequest,
+    OperatorDeliveryRecord,
     WebhookJob,
     WebhookDeadLetter,
     WebhookDelivery,
@@ -78,6 +79,7 @@ class InMemoryRepository:
         self._operators: dict[UUID, OperatorRecord] = {}
         self._operator_tokens_by_id: dict[UUID, str] = {}
         self._operator_ids_by_token: dict[str, UUID] = {}
+        self._operator_deliveries: list[dict] = []
         self._ops_metrics_history: list[OpsMetricsHistoryPoint] = []
 
     @staticmethod
@@ -499,6 +501,45 @@ class InMemoryRepository:
             )
             self._operators[operator_id] = updated
             return updated
+
+    def record_operator_delivery(
+        self,
+        operator_id: UUID,
+        task_id: UUID,
+        channel: str,
+        status: str,
+        attempt: int,
+        error: str | None = None,
+    ) -> None:
+        with self._lock:
+            self._operator_deliveries.append(
+                {
+                    "id": uuid4(),
+                    "operator_id": operator_id,
+                    "task_id": task_id,
+                    "channel": channel,
+                    "status": status,
+                    "attempt": attempt,
+                    "error": error,
+                    "created_at": utcnow(),
+                }
+            )
+
+    def get_operator_last_delivery(self, operator_id: UUID) -> OperatorDeliveryRecord | None:
+        with self._lock:
+            for row in reversed(self._operator_deliveries):
+                if row["operator_id"] == operator_id:
+                    return OperatorDeliveryRecord(
+                        id=row["id"],
+                        operator_id=row["operator_id"],
+                        task_id=row["task_id"],
+                        channel=row["channel"],
+                        status=row["status"],
+                        attempt=int(row["attempt"]),
+                        error=row.get("error"),
+                        created_at=row["created_at"],
+                    )
+            return None
 
     def create_task(self, api_key: str, payload: CreateTaskRequest) -> Task:
         with self._lock:

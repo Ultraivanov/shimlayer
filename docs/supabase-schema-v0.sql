@@ -183,6 +183,20 @@ create table if not exists public.operator_rate_windows (
 create index if not exists idx_operator_rate_windows_window
   on public.operator_rate_windows(window_start);
 
+create table if not exists public.operator_deliveries (
+  id uuid primary key default uuid_generate_v4(),
+  operator_id uuid not null references public.operators(id) on delete cascade,
+  task_id uuid not null references public.tasks(id) on delete cascade,
+  channel text not null,
+  status text not null,
+  attempt integer not null default 1,
+  error text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_operator_deliveries_operator
+  on public.operator_deliveries(operator_id, created_at desc);
+
 insert into public.package_catalog (code, flows, price_usd, active)
 values
   ('indie_entry_150', 150, 255.00, true),
