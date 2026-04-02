@@ -101,6 +101,16 @@ export type OperatorDeliveryRecord = {
   created_at: string;
 };
 
+export type OperatorAuditEntry = {
+  id: string;
+  operator_id: string;
+  actor: string;
+  action: string;
+  note?: string | null;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+};
+
 export type BalanceResponse = {
   account_id: string;
   balance_usd: number;

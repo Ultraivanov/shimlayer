@@ -24,7 +24,8 @@ import type {
   OperatorApplicationCreateRequest,
   OperatorApplicationRecord,
   OperatorRecord,
-  OperatorDeliveryRecord
+  OperatorDeliveryRecord,
+  OperatorAuditEntry
 } from "./types";
 
 type Config = {
@@ -170,6 +171,8 @@ export const Api = {
     ),
   getOpsOperatorLastDelivery: (operatorId: string) =>
     http<OperatorDeliveryRecord | null>(`/v1/ops/operators/${operatorId}/deliveries/last`, {}, true),
+  getOpsOperatorAudit: (operatorId: string, limit = 20) =>
+    http<OperatorAuditEntry[]>(`/v1/ops/operators/${operatorId}/audit?limit=${limit}`, {}, true),
   unlinkOpsOperatorChat: (operatorId: string) =>
     http<OperatorRecord>(`/v1/ops/operators/${operatorId}/unlink-chat`, { method: "POST" }, true),
   notifyOperatorTask: (operatorId: string, payload: { task_id: string; message?: string | null }) =>

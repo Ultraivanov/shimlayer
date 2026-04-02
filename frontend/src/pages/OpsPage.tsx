@@ -210,6 +210,9 @@ export function OpsPage() {
   const [operatorNotifyAtById, setOperatorNotifyAtById] = useState<Record<string, string>>({});
   const [operatorNotifyErrorById, setOperatorNotifyErrorById] = useState<Record<string, string>>({});
   const [operatorManageId, setOperatorManageId] = useState<string>("");
+  const [operatorAuditById, setOperatorAuditById] = useState<Record<string, Array<{ id: string; actor: string; action: string; note?: string | null; created_at: string }>>>({});
+  const [operatorAuditOpenById, setOperatorAuditOpenById] = useState<Record<string, boolean>>({});
+  const [operatorAuditLoadingId, setOperatorAuditLoadingId] = useState<string>("");
 
   const [showOnlyProblem, setShowOnlyProblem] = useState<boolean>(() => loadFlag("ops.showOnlyProblem", false));
   const [showSlaBreachQueue, setShowSlaBreachQueue] = useState<boolean>(() => loadFlag("ops.showSlaBreachQueue", false));
@@ -1199,6 +1202,30 @@ export function OpsPage() {
       pushToast("error", `Verification update failed: ${String(e)}`);
     } finally {
       setOperatorManageId("");
+    }
+  }
+
+  async function toggleOperatorAudit(operatorId: string) {
+    if (!canManageOperators) return;
+    setOperatorAuditOpenById((prev) => ({ ...prev, [operatorId]: !prev[operatorId] }));
+    if (operatorAuditById[operatorId]) return;
+    setOperatorAuditLoadingId(operatorId);
+    try {
+      const rows = await Api.getOpsOperatorAudit(operatorId, 20);
+      setOperatorAuditById((prev) => ({
+        ...prev,
+        [operatorId]: rows.map((r) => ({
+          id: r.id,
+          actor: r.actor,
+          action: r.action,
+          note: r.note ?? null,
+          created_at: r.created_at
+        }))
+      }));
+    } catch (e) {
+      pushToast("error", `Audit load failed: ${String(e)}`);
+    } finally {
+      setOperatorAuditLoadingId("");
     }
   }
 
@@ -3815,6 +3842,31 @@ export function OpsPage() {
                     >
                       Unlink chat
                     </Button>
+                    <Button
+                      size="s"
+                      view={operatorAuditOpenById[operatorId] ? "action" : "flat"}
+                      onClick={() => void toggleOperatorAudit(operatorId)}
+                      loading={operatorAuditLoadingId === operatorId}
+                      disabled={!canManageOperators || operatorAuditLoadingId === operatorId}
+                    >
+                      {operatorAuditOpenById[operatorId] ? "Hide audit" : "Show audit"}
+                    </Button>
+                  </div>
+                ) : null}
+                {app.status === "approved" && operatorId && operatorAuditOpenById[operatorId] ? (
+                  <div className="list" style={{ marginTop: 8 }}>
+                    {operatorAuditLoadingId === operatorId ? <p className="muted">Loading audit…</p> : null}
+                    {(operatorAuditById[operatorId] ?? []).map((entry) => (
+                      <div key={entry.id} className="row-tight" style={{ justifyContent: "space-between" }}>
+                        <span className="muted mono">
+                          {new Date(entry.created_at).toLocaleString()} · {entry.actor} · {entry.action}
+                        </span>
+                        {entry.note ? <span className="muted">{entry.note}</span> : null}
+                      </div>
+                    ))}
+                    {operatorAuditLoadingId !== operatorId && (operatorAuditById[operatorId]?.length ?? 0) === 0 ? (
+                      <p className="muted">No audit entries yet.</p>
+                    ) : null}
                   </div>
                 ) : null}
                 {app.status === "pending" ? (
