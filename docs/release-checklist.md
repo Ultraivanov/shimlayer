@@ -1,12 +1,24 @@
-# Release Checklist (ShimLayer)
+## Release checklist (MVP)
 
-## Short checklist (release‑ready)
-- Run preflights: `./scripts/preflight_fast.sh` + `./scripts/preflight_ui.sh`
-- If Playwright bind is blocked locally: set `PW_REUSE_EXISTING=1` and reuse running servers (see `frontend/playwright.config.ts`)
-- Verify env/secrets: API keys, `SHIMLAYER_DB_DSN`, webhook secret (if used), Ops admin role header
-- DB ready: apply `docs/supabase-schema-v0.sql` (and ensure tables exist: `ops_metrics_history`, `leads`, `openai_interruptions`)
-- 5‑minute manual UX pass:
-  - Requester: create → upload proof → complete; open by ID
-  - Operator: claim → add proof → complete; interruption approve/reject
-  - Ops: presets/filters, inspector tabs, webhook resend+attempts, bulk download
-- Post‑deploy smoke: health endpoint + pages load + auto‑refresh healthy
+### Backend + config
+- `SHIMLAYER_REPOSITORY=postgres`
+- `SHIMLAYER_DB_DSN` set
+- `SHIMLAYER_ADMIN_API_KEY` / `SHIMLAYER_WEBHOOK_SECRET` not default
+- `SHIMLAYER_OPERATOR_RATE_LIMIT_PER_MINUTE` set (reasonable value)
+- Run `./scripts/preflight_fast.sh`
+
+### Database
+- Apply `docs/supabase-schema-v0.sql` (includes operators + deliveries + audit tables)
+
+### Telegram (operator delivery)
+- `SHIMLAYER_TELEGRAM_BOT_TOKEN` set
+- Bot responds to `/link <token>` (operator linking)
+
+### Ops smoke
+- Operator onboarding: approve → verify → notify task
+- Webhook resend when `callback_url` exists
+- Bulk download (1–2 tasks + zip)
+
+### Optional polish
+- Quick visual pass on Requester/Operator pages
+- Ops audit view UI (if needed)
