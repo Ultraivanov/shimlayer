@@ -147,6 +147,9 @@ export function OperatorPage() {
       const msg = String(e);
       if (msg.toLowerCase().includes("operator not verified")) {
         setError("Your operator account is pending verification. Ask ops to verify you.");
+        setAutoRefreshSeconds(0);
+        setAutoRefreshPausedUntilMs(0);
+        setAutoRefreshLastError("operator not verified");
       } else {
         setError(msg);
       }
