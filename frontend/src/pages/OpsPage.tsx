@@ -1882,6 +1882,8 @@ export function OpsPage() {
   }
 
   function applyFlowPreset(preset: "overdue" | "disputed" | "sla_risk" | "manual_review" | "clear") {
+    setPage(1);
+    setSelectedTaskIds([]);
     if (preset === "clear") {
       setStatusFilter("");
       setTaskTypeFilter("");
