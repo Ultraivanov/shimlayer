@@ -851,6 +851,12 @@ export function RequesterPage({ pushTask }: Props) {
     return proofAllowMetadataOnly;
   }, [proofAllowMetadataOnly, proofCanSubmit, proofWouldBeQuality]);
 
+  const proofPrimaryLabel = useMemo(() => {
+    if (!proofCanSubmit) return "Register proof";
+    if (proofWouldBeQuality) return "Register quality proof";
+    return proofAllowMetadataOnly ? "Register metadata-only proof" : "Register proof";
+  }, [proofAllowMetadataOnly, proofCanSubmit, proofWouldBeQuality]);
+
   useEffect(() => {
     if (proofWouldBeQuality && proofAllowMetadataOnly) setProofAllowMetadataOnly(false);
   }, [proofAllowMetadataOnly, proofWouldBeQuality]);
@@ -1877,17 +1883,17 @@ export function RequesterPage({ pushTask }: Props) {
 	                    />
 	                  </div>
 	                  <div className="row-tight" style={{ alignItems: "center" }}>
-	                    <TextInput
-	                      size="m"
-	                      value={proofChecksum}
-	                      onUpdate={setProofChecksum}
-	                      placeholder="checksum_sha256 (required for quality proof unless local:)"
-	                      disabled={proofBusy}
-	                    />
-			                    <Button
-			                      view="action"
-			                      disabled={proofBusy || !proofCanSubmitAsQuality}
-			                      loading={proofBusy}
+                    <TextInput
+                      size="m"
+                      value={proofChecksum}
+                      onUpdate={setProofChecksum}
+                      placeholder="checksum_sha256 (required for quality proof unless local:)"
+                      disabled={proofBusy}
+                    />
+                    <Button
+                      view="action"
+                      disabled={proofBusy || !proofCanSubmitAsQuality}
+                      loading={proofBusy}
                             title={
                               proofBusy
                                 ? "Registering…"
@@ -1901,11 +1907,11 @@ export function RequesterPage({ pushTask }: Props) {
                                         ? "Add checksum_sha256 (or use local:) to unblock completion"
                                         : "Register proof link"
                             }
-			                      onClick={() => void registerProofMetadata()}
-		                    >
-		                      {proofWouldBeQuality ? "Register proof" : proofAllowMetadataOnly ? "Register metadata (won’t unblock)" : "Add checksum to register"}
-		                    </Button>
-	                  </div>
+                      onClick={() => void registerProofMetadata()}
+                    >
+                      {proofPrimaryLabel}
+                    </Button>
+                  </div>
                     <p className="muted" style={{ marginTop: 4 }}>
                       To count as quality proof, provide <span className="mono">checksum_sha256</span> (or use a <span className="mono">local:</span> path).
                     </p>
