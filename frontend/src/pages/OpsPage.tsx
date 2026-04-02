@@ -1016,6 +1016,10 @@ export function OpsPage() {
 
   async function resendWebhook(taskId: string) {
     if (!canResendWebhook) return;
+    if (!selectedFlow?.callback_url) {
+      pushToast("error", "No callback URL on this task.");
+      return;
+    }
     setWebhookResendRunning(true);
     try {
       const res = await Api.resendWebhook(taskId);
