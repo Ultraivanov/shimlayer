@@ -700,8 +700,15 @@ export function RequesterPage({ pushTask }: Props) {
       setSelectedTaskId(task.id);
       pushToast("success", "Task created");
     } catch (e) {
-      setError(String(e));
-      pushToast("error", `Create failed: ${String(e)}`);
+      const msg = String(e);
+      setError(msg);
+      let friendly = msg;
+      if (msg.includes("402") || msg.toLowerCase().includes("payment required") || msg.toLowerCase().includes("flow credits")) {
+        friendly = "Insufficient credits. For local dev, set SHIMLAYER_DEV_SEED_CREDITS or top up in Ops.";
+      } else if (msg.includes("429") || msg.toLowerCase().includes("rate limit")) {
+        friendly = "Rate limited. For local dev, set SHIMLAYER_DEV_PLAN=pro or wait a minute.";
+      }
+      pushToast("error", `Create failed: ${friendly}`);
     } finally {
       setCreateBusy(false);
     }

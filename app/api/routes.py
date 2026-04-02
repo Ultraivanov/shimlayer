@@ -418,10 +418,13 @@ def _apply_ops_action(
 
 def require_api_key(
     x_api_key: str | None = Header(default=None),
+    x_admin_key: str | None = Header(default=None),
     repo: Repository = Depends(get_repo),
 ) -> str:
     if not x_api_key:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing X-API-Key")
+    if x_admin_key and x_admin_key == settings.shimlayer_admin_api_key:
+        return x_api_key
     try:
         repo.consume_rate_limit(x_api_key)
     except RateLimitExceededError as exc:

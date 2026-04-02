@@ -145,7 +145,11 @@ export function OperatorPage() {
       return { ok: true as const };
     } catch (e) {
       const msg = String(e);
-      setError(msg);
+      if (msg.toLowerCase().includes("operator not verified")) {
+        setError("Your operator account is pending verification. Ask ops to verify you.");
+      } else {
+        setError(msg);
+      }
       return { ok: false as const, error: msg };
     } finally {
       refreshInFlightRef.current = false;
