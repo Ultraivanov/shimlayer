@@ -56,6 +56,7 @@ from app.models import (
     OperatorApprovalResponse,
     OperatorDeliveryRecord,
     OperatorDeliverySummary,
+    OperatorAuditEntry,
     OperatorRecord,
     OperatorTokenRotateResponse,
     PackagePurchaseRequest,
@@ -1692,6 +1693,11 @@ def rotate_operator_token(
     if not rotated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Operator not found")
     operator, token = rotated
+    repo.append_operator_audit(
+        operator_id=operator_id,
+        actor=f"ops:{admin_ctx.user_id}",
+        action="rotate_token",
+    )
     return OperatorTokenRotateResponse(operator=operator, operator_token=token)
 
 
@@ -1710,6 +1716,12 @@ def update_operator_status(
     operator = repo.update_operator_status(operator_id, payload.status)
     if not operator:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Operator not found")
+    repo.append_operator_audit(
+        operator_id=operator_id,
+        actor=f"ops:{admin_ctx.user_id}",
+        action="update_status",
+        note=payload.status,
+    )
     return operator
 
 
@@ -1727,6 +1739,11 @@ def unlink_operator_chat(
     operator = repo.unlink_operator_chat(operator_id)
     if not operator:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Operator not found")
+    repo.append_operator_audit(
+        operator_id=operator_id,
+        actor=f"ops:{admin_ctx.user_id}",
+        action="unlink_chat",
+    )
     return operator
 
 
@@ -1750,6 +1767,13 @@ def update_operator_verification(
     )
     if not operator:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Operator not found")
+    repo.append_operator_audit(
+        operator_id=operator_id,
+        actor=f"ops:{admin_ctx.user_id}",
+        action="update_verification",
+        note=payload.verification_status,
+        metadata={"note": payload.verification_note} if payload.verification_note else None,
+    )
     return operator
 
 
@@ -1844,9 +1868,31 @@ def notify_operator_task(
         attempt=1,
         error=None if sent else "telegram_failed",
     )
+    repo.append_operator_audit(
+        operator_id=operator_id,
+        actor=f"ops:{admin_ctx.user_id}",
+        action="notify_task",
+        note=str(payload.task_id),
+        metadata={"status": status},
+    )
     if not sent:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Telegram delivery failed")
     return {"sent": True}
+
+
+@router.get("/ops/operators/{operator_id}/audit", response_model=list[OperatorAuditEntry])
+def list_operator_audit(
+    operator_id: UUID,
+    limit: int = 50,
+    api_key: str = Depends(require_api_key),
+    admin_key: str = Depends(require_admin_key),
+    admin_ctx: AdminContext = Depends(require_admin_context),
+    repo: Repository = Depends(get_repo),
+) -> list[OperatorAuditEntry]:
+    _ = (api_key, admin_key, admin_ctx)
+    if admin_ctx.role not in ("ops_manager", "admin"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role for operator onboarding")
+    return repo.list_operator_audit(operator_id, limit=limit)
 
 
 @router.get("/ops/operators/{operator_id}/deliveries/last", response_model=OperatorDeliveryRecord | None)

@@ -231,6 +231,16 @@ class OperatorDeliverySummary(BaseModel):
     last_delivery: OperatorDeliveryRecord | None = None
 
 
+class OperatorAuditEntry(BaseModel):
+    id: UUID
+    operator_id: UUID
+    actor: str
+    action: str
+    note: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+
+
 class Artifact(BaseModel):
     id: UUID
     task_id: UUID

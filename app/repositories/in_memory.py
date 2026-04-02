@@ -35,6 +35,7 @@ from app.models import (
     TaskWithReview,
     TopUpRequest,
     OperatorApplicationRecord,
+    OperatorAuditEntry,
     OperatorRecord,
     UpdateOperatorApplicationRequest,
     OperatorDeliveryRecord,
@@ -80,6 +81,7 @@ class InMemoryRepository:
         self._operator_tokens_by_id: dict[UUID, str] = {}
         self._operator_ids_by_token: dict[str, UUID] = {}
         self._operator_deliveries: list[dict] = []
+        self._operator_audit: dict[UUID, list[OperatorAuditEntry]] = {}
         self._ops_metrics_history: list[OpsMetricsHistoryPoint] = []
 
     @staticmethod
@@ -540,6 +542,33 @@ class InMemoryRepository:
                         created_at=row["created_at"],
                     )
             return None
+
+    def append_operator_audit(
+        self,
+        operator_id: UUID,
+        actor: str,
+        action: str,
+        note: str | None = None,
+        metadata: dict | None = None,
+    ) -> OperatorAuditEntry | None:
+        with self._lock:
+            entry = OperatorAuditEntry(
+                id=uuid4(),
+                operator_id=operator_id,
+                actor=actor,
+                action=action,
+                note=note,
+                metadata=metadata or {},
+                created_at=utcnow(),
+            )
+            self._operator_audit.setdefault(operator_id, []).append(entry)
+            return entry
+
+    def list_operator_audit(self, operator_id: UUID, limit: int = 50) -> list[OperatorAuditEntry]:
+        with self._lock:
+            rows = self._operator_audit.get(operator_id, [])
+            rows = list(reversed(rows))[: max(1, min(limit, 200))]
+            return list(rows)
 
     def create_task(self, api_key: str, payload: CreateTaskRequest) -> Task:
         with self._lock:

@@ -197,6 +197,19 @@ create table if not exists public.operator_deliveries (
 create index if not exists idx_operator_deliveries_operator
   on public.operator_deliveries(operator_id, created_at desc);
 
+create table if not exists public.operator_audit (
+  id uuid primary key default uuid_generate_v4(),
+  operator_id uuid not null references public.operators(id) on delete cascade,
+  actor text not null,
+  action text not null,
+  note text,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_operator_audit_operator
+  on public.operator_audit(operator_id, created_at desc);
+
 insert into public.package_catalog (code, flows, price_usd, active)
 values
   ('indie_entry_150', 150, 255.00, true),

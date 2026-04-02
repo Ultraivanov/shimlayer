@@ -33,6 +33,7 @@ from app.models import (
     LeadRecord,
     CreateOperatorApplicationRequest,
     OperatorApplicationRecord,
+    OperatorAuditEntry,
     OperatorRecord,
     UpdateOperatorApplicationRequest,
     OperatorDeliveryRecord,
@@ -109,6 +110,15 @@ class Repository(Protocol):
         error: str | None = None,
     ) -> None: ...
     def get_operator_last_delivery(self, operator_id: UUID) -> OperatorDeliveryRecord | None: ...
+    def append_operator_audit(
+        self,
+        operator_id: UUID,
+        actor: str,
+        action: str,
+        note: str | None = None,
+        metadata: dict | None = None,
+    ) -> OperatorAuditEntry | None: ...
+    def list_operator_audit(self, operator_id: UUID, limit: int = 50) -> list[OperatorAuditEntry]: ...
 
     def create_task(self, api_key: str, payload: CreateTaskRequest) -> Task: ...
     def list_account_tasks_with_review(

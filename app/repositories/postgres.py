@@ -41,6 +41,7 @@ from app.models import (
     WebhookDeadLetter,
     WebhookDelivery,
     OperatorApplicationRecord,
+    OperatorAuditEntry,
     OperatorRecord,
     UpdateOperatorApplicationRequest,
     OperatorDeliveryRecord,
@@ -1066,6 +1067,68 @@ class PostgresRepository:
             error=row.get("error"),
             created_at=row["created_at"],
         )
+
+    def append_operator_audit(
+        self,
+        operator_id: UUID,
+        actor: str,
+        action: str,
+        note: str | None = None,
+        metadata: dict | None = None,
+    ) -> OperatorAuditEntry | None:
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    insert into public.operator_audit
+                    (id, operator_id, actor, action, note, metadata, created_at)
+                    values (%s, %s, %s, %s, %s, %s, now())
+                    returning id, operator_id, actor, action, note, metadata, created_at
+                    """,
+                    (uuid4(), operator_id, actor, action, note, Json(metadata or {})),
+                )
+                row = cur.fetchone()
+            conn.commit()
+        if not row:
+            return None
+        return OperatorAuditEntry(
+            id=row["id"],
+            operator_id=row["operator_id"],
+            actor=row["actor"],
+            action=row["action"],
+            note=row.get("note"),
+            metadata=row.get("metadata") or {},
+            created_at=row["created_at"],
+        )
+
+    def list_operator_audit(self, operator_id: UUID, limit: int = 50) -> list[OperatorAuditEntry]:
+        capped = max(1, min(limit, 200))
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    select id, operator_id, actor, action, note, metadata, created_at
+                    from public.operator_audit
+                    where operator_id = %s
+                    order by created_at desc
+                    limit %s
+                    """,
+                    (operator_id, capped),
+                )
+                rows = cur.fetchall() or []
+            conn.commit()
+        return [
+            OperatorAuditEntry(
+                id=row["id"],
+                operator_id=row["operator_id"],
+                actor=row["actor"],
+                action=row["action"],
+                note=row.get("note"),
+                metadata=row.get("metadata") or {},
+                created_at=row["created_at"],
+            )
+            for row in rows
+        ]
 
     def create_task(self, api_key: str, payload: CreateTaskRequest) -> Task:
         with self._conn() as conn:
