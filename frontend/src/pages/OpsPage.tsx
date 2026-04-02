@@ -1381,6 +1381,7 @@ export function OpsPage() {
     if (autoRefreshSeconds === 0 || !isPageVisible) return;
     const timer = window.setInterval(() => {
       if (isRefreshing || isClaimRunning || isActionRunning || isLockRenewing || lockRenewInFlightRef.current) return;
+      if (isDownloadRunning || isBulkRunning) return;
       if (Date.now() < autoRefreshPausedUntilMs) return;
       void refresh({ source: "auto" }).then((res) => {
         if (res.ok) {
@@ -1401,6 +1402,8 @@ export function OpsPage() {
     autoRefreshSeconds,
     isActionRunning,
     isClaimRunning,
+    isBulkRunning,
+    isDownloadRunning,
     isLockRenewing,
     isPageVisible,
     isRefreshing,
