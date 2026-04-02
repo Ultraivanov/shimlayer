@@ -1838,6 +1838,15 @@ export function OpsPage() {
     }
   }
 
+  function downloadSelectedBundlesZipOrFallback() {
+    const taskIds = Array.from(new Set(selectedTaskIds));
+    if (taskIds.length < 2) {
+      void downloadSelectedBundles();
+      return;
+    }
+    void downloadSelectedBundlesZip();
+  }
+
   function confirmIfManyDownloads(count: number, mode: "multi" | "zip", onConfirm: () => void) {
     const threshold = 10;
     if (count <= threshold) {
@@ -3123,21 +3132,23 @@ export function OpsPage() {
                       <Button
                         view="flat"
                         data-testid="ops-download-selected-bundles-zip"
-                        disabled={selectedTaskIds.length < 2 || isDownloadRunning || isBulkRunning}
-                        loading={isDownloadRunning && downloadProgress?.mode === "zip"}
+                        disabled={selectedTaskIds.length === 0 || isDownloadRunning || isBulkRunning}
+                        loading={isDownloadRunning && (downloadProgress?.mode === "zip" || downloadProgress?.mode === "multi")}
                         onClick={() => {
                           const count = Array.from(new Set(selectedTaskIds)).length;
-                          confirmIfManyDownloads(count, "zip", () => void downloadSelectedBundlesZip());
+                          confirmIfManyDownloads(count, count < 2 ? "multi" : "zip", () => void downloadSelectedBundlesZipOrFallback());
                         }}
                         title={
-                          selectedTaskIds.length < 2
-                            ? "Select 2+ flows to enable single-zip download"
+                          selectedTaskIds.length === 0
+                            ? "Select 1+ flows to enable download"
                             : "Download all selected bundles as one zip"
                         }
                       >
                         {isDownloadRunning && downloadProgress?.mode === "zip"
                           ? `Preparing zip ${downloadProgress.done}/${downloadProgress.total}`
-                          : `Download as one zip${selectedTaskIds.length ? ` (${selectedTaskIds.length})` : ""}`}
+                          : isDownloadRunning && downloadProgress?.mode === "multi"
+                            ? `Downloading ${downloadProgress.done}/${downloadProgress.total}`
+                            : `Download as one zip${selectedTaskIds.length ? ` (${selectedTaskIds.length})` : ""}`}
                       </Button>
                     ) : null}
                     {downloadProgress ? (
