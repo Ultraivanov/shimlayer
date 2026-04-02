@@ -506,6 +506,7 @@ export function RequesterPage({ pushTask }: Props) {
   async function autoRefreshTick() {
     if (!isPageVisible) return;
     if (!autoRefreshSeconds) return;
+    if (createBusy || taskActionBusy || openAiBusy || uploadBusy || proofBusy || taskLookupBusy) return;
     const now = Date.now();
     const pausedUntil = autoRefreshPausedUntilMsRef.current;
     if (pausedUntil && now < pausedUntil) return;

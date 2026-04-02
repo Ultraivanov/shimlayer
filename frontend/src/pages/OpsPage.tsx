@@ -1345,6 +1345,7 @@ export function OpsPage() {
     const timer = window.setInterval(() => {
       if (manualQueueRefreshInFlightRef.current) return;
       if (isRefreshing || isClaimRunning || isLockRenewing || lockRenewInFlightRef.current) return;
+      if (isBulkRunning || isDownloadRunning) return;
       const now = Date.now();
       const pausedUntil = manualQueuePausedUntilMsRef.current;
       if (pausedUntil && now < pausedUntil) return;
