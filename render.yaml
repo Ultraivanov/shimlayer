@@ -1,0 +1,74 @@
+services:
+  - name: shimlayer-api
+    type: web
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: SHIMLAYER_REPOSITORY
+        value: postgres
+      - key: SHIMLAYER_DB_DSN
+        fromDatabase:
+          name: shimlayer-db
+          property: connectionString
+      - key: SHIMLAYER_ADMIN_API_KEY
+        generateValue: true
+      - key: SHIMLAYER_WEBHOOK_SECRET
+        generateValue: true
+      - key: SHIMLAYER_OPERATOR_RATE_LIMIT_PER_MINUTE
+        value: "120"
+      - key: SHIMLAYER_TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: SHIMLAYER_CORS_ORIGINS
+        sync: false
+
+  - name: shimlayer-webhook-worker
+    type: worker
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m app.workers.webhook_worker
+    envVars:
+      - key: SHIMLAYER_REPOSITORY
+        value: postgres
+      - key: SHIMLAYER_DB_DSN
+        fromDatabase:
+          name: shimlayer-db
+          property: connectionString
+      - key: SHIMLAYER_ADMIN_API_KEY
+        fromService:
+          name: shimlayer-api
+          type: web
+          envVarKey: SHIMLAYER_ADMIN_API_KEY
+      - key: SHIMLAYER_WEBHOOK_SECRET
+        fromService:
+          name: shimlayer-api
+          type: web
+          envVarKey: SHIMLAYER_WEBHOOK_SECRET
+
+  - name: shimlayer-frontend
+    type: web
+    runtime: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        sync: false
+      - key: VITE_API_KEY
+        sync: false
+      - key: VITE_ADMIN_KEY
+        sync: false
+      - key: VITE_ADMIN_ROLE
+        value: admin
+      - key: VITE_ADMIN_USER
+        value: render-admin
+      - key: VITE_OPERATOR_KEY
+        sync: false
+
+databases:
+  - name: shimlayer-db
+    plan: basic-256mb
+    databaseName: shimlayer
+    user: shimlayer
